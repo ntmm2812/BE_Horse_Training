@@ -19,4 +19,8 @@ public interface IUserRepository
     Task<User?> GetByIdWithRoleAsync(int userId, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<User>> GetActiveUsersByCanonicalRoleAsync(
+        string canonicalRoleId,
+        CancellationToken cancellationToken = default);
 }

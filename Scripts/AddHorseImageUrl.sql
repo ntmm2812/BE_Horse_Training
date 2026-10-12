@@ -1,0 +1,4 @@
+IF COL_LENGTH('Horse', 'ImageURL') IS NULL
+BEGIN
+    ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
+END;

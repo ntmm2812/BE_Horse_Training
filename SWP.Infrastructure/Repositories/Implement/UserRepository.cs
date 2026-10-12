@@ -100,4 +100,22 @@ public class UserRepository : IUserRepository
         _context.Users.Update(user);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<User>> GetActiveUsersByCanonicalRoleAsync(
+        string canonicalRoleId,
+        CancellationToken cancellationToken = default)
+    {
+        var target = RoleMapper.ToRoleId(canonicalRoleId);
+        var users = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .Where(u => u.Status.ToLower() == UserStatuses.Active.ToLower())
+            .ToListAsync(cancellationToken);
+
+        return users
+            .Where(u => RoleMapper.TryMapToCanonicalRoleId(u.Role.RoleName, out var mapped)
+                        && string.Equals(mapped, target, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(u => u.FullName)
+            .ToList();
+    }
 }

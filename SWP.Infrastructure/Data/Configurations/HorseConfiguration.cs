@@ -22,6 +22,10 @@ public class HorseConfiguration : IEntityTypeConfiguration<Horse>
             .IsUnicode(false);
         entity.Property(e => e.Height).HasColumnType("decimal(5, 2)");
         entity.Property(e => e.HorseName).HasMaxLength(100);
+        entity.Property(e => e.ImageUrl)
+            .HasMaxLength(500)
+            .IsUnicode(false)
+            .HasColumnName("ImageURL");
         entity.Property(e => e.HorseStatus)
             .HasMaxLength(30)
             .IsUnicode(false);

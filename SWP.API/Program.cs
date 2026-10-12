@@ -16,6 +16,8 @@ namespace SWP.API
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -86,6 +88,15 @@ namespace SWP.API
             });
 
             var app = builder.Build();
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                db.Database.ExecuteSqlRaw("""
+                    IF COL_LENGTH('Horse', 'ImageURL') IS NULL
+                        ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
+                    """);
+            }
 
             if (app.Environment.IsDevelopment())
             {
