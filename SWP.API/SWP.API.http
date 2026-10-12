@@ -9,3 +9,14 @@ Content-Type: application/json
 }
 
 ###
+
+POST {{SWP.API_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Nguyễn Văn Owner",
+  "email": "newowner@equitrack.vn",
+  "password": "123456"
+}
+
+###

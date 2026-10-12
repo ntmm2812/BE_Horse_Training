@@ -31,4 +31,30 @@ public class AuthController : ControllerBase
 
         return Ok(result.Data);
     }
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _authService.RegisterAsync(request, cancellationToken);
+
+        if (!result.Success)
+        {
+            if (result.ErrorCode == "EMAIL_EXISTS")
+            {
+                return Conflict(new
+                {
+                    message = result.ErrorMessage,
+                    code = result.ErrorCode,
+                });
+            }
+
+            return BadRequest(new
+            {
+                message = result.ErrorMessage,
+                code = result.ErrorCode,
+            });
+        }
+
+        return StatusCode(StatusCodes.Status201Created, result.Data);
+    }
 }
