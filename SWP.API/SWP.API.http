@@ -1,6 +1,11 @@
 @SWP.API_HostAddress = http://localhost:5214
 
-GET {{SWP.API_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{SWP.API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "trainer@equitrack.vn",
+  "password": "123456"
+}
 
 ###

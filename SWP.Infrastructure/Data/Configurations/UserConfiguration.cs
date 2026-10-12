@@ -8,6 +8,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 {
     public void Configure(EntityTypeBuilder<User> entity)
     {
+        entity.ToTable("Users");
+
         entity.HasKey(e => e.UserId).HasName("PK__Users__1788CCAC35C85A4D");
 
         entity.HasIndex(e => e.Email, "UQ__Users__A9D10534EDA32067").IsUnique();
