@@ -1,0 +1,25 @@
+# Build output and IDE state
+**/[Bb]in/
+**/[Oo]bj/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+SWP.API/appsettings.json
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+*.pfx
+*.p12
+*.key
+
+# Separate repository already present in this workspace
+/BE_Horse/
