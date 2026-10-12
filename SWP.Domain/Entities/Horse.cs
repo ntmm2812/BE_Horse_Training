@@ -43,6 +43,8 @@ public class Horse
 
     public virtual ICollection<FeedingPlan> FeedingPlans { get; set; } = new List<FeedingPlan>();
 
+    public virtual HorseHealthStatus? HealthStatusRecord { get; set; }
+
     public virtual ICollection<HealthMetric> HealthMetrics { get; set; } = new List<HealthMetric>();
 
     public virtual User? LockedByUser { get; set; }

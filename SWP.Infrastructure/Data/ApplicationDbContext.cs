@@ -25,6 +25,8 @@ public class ApplicationDbContext : DbContext
 
     public virtual DbSet<Horse> Horses { get; set; }
 
+    public virtual DbSet<HorseHealthStatus> HorseHealthStatuses { get; set; }
+
     public virtual DbSet<MedicalRecord> MedicalRecords { get; set; }
 
     public virtual DbSet<Permission> Permissions { get; set; }

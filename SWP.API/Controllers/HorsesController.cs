@@ -1,6 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SWP.Application.Services.Interface;
+using SWP.Domain.Common;
 
 namespace SWP.API.Controllers;
 
@@ -14,6 +17,24 @@ public class HorsesController : ControllerBase
     public HorsesController(IHorseService horseService)
     {
         _horseService = horseService;
+    }
+
+    [HttpGet("health-statuses")]
+    public async Task<IActionResult> GetHealthStatuses(CancellationToken cancellationToken)
+    {
+        if (IsHorseOwnerOnly())
+        {
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return Unauthorized(new { message = "Không xác định được tài khoản đăng nhập." });
+            }
+
+            var ownerStatuses = await _horseService.GetHealthStatusesForOwnerAsync(userId, cancellationToken);
+            return Ok(ownerStatuses);
+        }
+
+        var statuses = await _horseService.GetHealthStatusesAsync(cancellationToken);
+        return Ok(statuses);
     }
 
     [HttpGet]
@@ -33,5 +54,17 @@ public class HorsesController : ControllerBase
         }
 
         return Ok(horse);
+    }
+
+    private bool IsHorseOwnerOnly() =>
+        User.IsInRole(RoleNames.HorseOwner) && !User.IsInRole(RoleNames.ClubManager);
+
+    private bool TryGetCurrentUserId(out int userId)
+    {
+        userId = 0;
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return !string.IsNullOrWhiteSpace(sub) && int.TryParse(sub, out userId);
     }
 }

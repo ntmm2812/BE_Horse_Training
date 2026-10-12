@@ -18,4 +18,13 @@ public class HorseDto
     public int OwnerID { get; set; }
 
     public string? PhotoUrl { get; set; }
+
+    public string? GioiTinh { get; set; }
+
+    public string? MauLong { get; set; }
+
+    /// <summary>Ngày sinh dạng yyyy-MM-dd.</summary>
+    public string? NgaySinh { get; set; }
+
+    public decimal? ChieuCao { get; set; }
 }

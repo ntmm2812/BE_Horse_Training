@@ -15,4 +15,15 @@ public class SaveHorseRequestDto
     public int OwnerID { get; set; }
 
     public string? PhotoUrl { get; set; }
+
+    public string? GioiTinh { get; set; }
+
+    public string? MauLong { get; set; }
+
+    /// <summary>Ngày sinh yyyy-MM-dd (ưu tiên hơn Tuoi).</summary>
+    public string? NgaySinh { get; set; }
+
+    public decimal? ChieuCao { get; set; }
+
+    public string? TrangThaiSucKhoe { get; set; }
 }

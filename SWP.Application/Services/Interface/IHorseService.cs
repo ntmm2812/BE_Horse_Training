@@ -29,4 +29,17 @@ public interface IHorseService
         CancellationToken cancellationToken = default);
 
     Task<bool> DeleteAsync(int horseId, CancellationToken cancellationToken = default);
+
+    Task<(bool Success, HorseDto? Data, string? Error)> UploadPhotoAsync(
+        int horseId,
+        Stream fileStream,
+        string contentType,
+        long fileLength,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<HorseHealthStatusDto>> GetHealthStatusesAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<HorseHealthStatusDto>> GetHealthStatusesForOwnerAsync(
+        int ownerUserId,
+        CancellationToken cancellationToken = default);
 }

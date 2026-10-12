@@ -12,15 +12,18 @@ public class HorseService : IHorseService
     private readonly IHorseRepository _horseRepository;
     private readonly IUserRepository _userRepository;
     private readonly IHorsePhotoStorage _horsePhotoStorage;
+    private readonly IHorseHealthStatusRepository _horseHealthStatusRepository;
 
     public HorseService(
         IHorseRepository horseRepository,
         IUserRepository userRepository,
-        IHorsePhotoStorage horsePhotoStorage)
+        IHorsePhotoStorage horsePhotoStorage,
+        IHorseHealthStatusRepository horseHealthStatusRepository)
     {
         _horseRepository = horseRepository;
         _userRepository = userRepository;
         _horsePhotoStorage = horsePhotoStorage;
+        _horseHealthStatusRepository = horseHealthStatusRepository;
     }
 
     public async Task<IReadOnlyList<HorseDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -111,6 +114,16 @@ public class HorseService : IHorseService
             return (false, null, photoError);
         }
 
+        var healthError = await ApplyHealthStatusAsync(
+            created.HorseId,
+            request.TrangThaiSucKhoe,
+            applyDefaultWhenMissing: true,
+            cancellationToken);
+        if (healthError is not null)
+        {
+            return (false, null, healthError);
+        }
+
         return (true, HorseMapper.ToDto(created), null);
     }
 
@@ -144,7 +157,78 @@ public class HorseService : IHorseService
 
         HorseMapper.ApplyUpdate(horse, request);
         await _horseRepository.UpdateAsync(horse, cancellationToken);
+
+        var healthError = await ApplyHealthStatusAsync(
+            horse.HorseId,
+            request.TrangThaiSucKhoe,
+            applyDefaultWhenMissing: false,
+            cancellationToken);
+        if (healthError is not null)
+        {
+            return (false, null, healthError);
+        }
+
         return (true, HorseMapper.ToDto(horse), null);
+    }
+
+    public async Task<IReadOnlyList<HorseHealthStatusDto>> GetHealthStatusesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _horseHealthStatusRepository.GetAllAsync(cancellationToken);
+        return rows.Select(HorseHealthStatusMapper.ToDto).ToList();
+    }
+
+    public async Task<IReadOnlyList<HorseHealthStatusDto>> GetHealthStatusesForOwnerAsync(
+        int ownerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _horseHealthStatusRepository.GetByOwnerUserIdAsync(ownerUserId, cancellationToken);
+        return rows.Select(HorseHealthStatusMapper.ToDto).ToList();
+    }
+
+    private const long MaxPhotoBytes = 5 * 1024 * 1024;
+
+    private static readonly HashSet<string> AllowedPhotoContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    };
+
+    public async Task<(bool Success, HorseDto? Data, string? Error)> UploadPhotoAsync(
+        int horseId,
+        Stream fileStream,
+        string contentType,
+        long fileLength,
+        CancellationToken cancellationToken = default)
+    {
+        if (fileLength <= 0 || fileLength > MaxPhotoBytes)
+        {
+            return (false, null, "Ảnh phải lớn hơn 0 và không quá 5 MB.");
+        }
+
+        if (!AllowedPhotoContentTypes.Contains(contentType))
+        {
+            return (false, null, "Chỉ nhận ảnh JPG, PNG hoặc WebP.");
+        }
+
+        var horse = await _horseRepository.GetByIdForUpdateAsync(horseId, cancellationToken);
+        if (horse is null)
+        {
+            return (false, null, "Không tìm thấy ngựa.");
+        }
+
+        try
+        {
+            var imageUrl = await _horsePhotoStorage.UploadAsync(horseId, fileStream, contentType, cancellationToken);
+            horse.ImageUrl = imageUrl;
+            await _horseRepository.UpdateAsync(horse, cancellationToken);
+            return (true, HorseMapper.ToDto(horse), null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return (false, null, ex.Message);
+        }
     }
 
     public async Task<bool> DeleteAsync(int horseId, CancellationToken cancellationToken = default)
@@ -181,7 +265,24 @@ public class HorseService : IHorseService
             return "Vui lòng chọn chủ sở hữu.";
         }
 
-        if (request.Tuoi <= 0)
+        if (string.IsNullOrWhiteSpace(request.NgaySinh) && request.Tuoi <= 0)
+        {
+            return "Vui lòng nhập ngày sinh.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.NgaySinh))
+        {
+            if (!DateOnly.TryParse(request.NgaySinh.Trim(), out var dateOfBirth))
+            {
+                return "Ngày sinh không hợp lệ.";
+            }
+
+            if (dateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
+            {
+                return "Ngày sinh không thể ở tương lai.";
+            }
+        }
+        else if (request.Tuoi <= 0)
         {
             return "Tuổi phải là số dương.";
         }
@@ -191,7 +292,47 @@ public class HorseService : IHorseService
             return "Cân nặng phải là số dương.";
         }
 
+        if (request.ChieuCao is < 0)
+        {
+            return "Chiều cao không hợp lệ.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.TrangThaiSucKhoe)
+            && !HorseHealthStatuses.IsValid(request.TrangThaiSucKhoe))
+        {
+            return "Trạng thái sức khỏe không hợp lệ.";
+        }
+
         return null;
+    }
+
+    private async Task<string?> ApplyHealthStatusAsync(
+        int horseId,
+        string? trangThaiSucKhoe,
+        bool applyDefaultWhenMissing,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(trangThaiSucKhoe))
+        {
+            if (!applyDefaultWhenMissing)
+            {
+                return null;
+            }
+
+            trangThaiSucKhoe = HorseHealthStatuses.DuDieuKien;
+        }
+
+        var status = trangThaiSucKhoe.Trim();
+
+        try
+        {
+            await _horseHealthStatusRepository.UpsertAsync(horseId, status, cancellationToken);
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
     }
 
     private async Task<string?> ApplyPhotoAsync(

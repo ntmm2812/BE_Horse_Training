@@ -54,6 +54,36 @@ public class ManagerHorsesController : ControllerBase
         return Ok(data);
     }
 
+    [HttpPost("{horseId:int}/photo")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<IActionResult> UploadPhoto(
+        int horseId,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Vui lòng chọn file ảnh." });
+        }
+
+        await using var stream = file.OpenReadStream();
+        var (success, data, error) = await _horseService.UploadPhotoAsync(
+            horseId,
+            stream,
+            file.ContentType,
+            file.Length,
+            cancellationToken);
+
+        if (!success)
+        {
+            return error == "Không tìm thấy ngựa."
+                ? NotFound(new { message = error })
+                : BadRequest(new { message = error });
+        }
+
+        return Ok(data);
+    }
+
     [HttpDelete("{horseId:int}")]
     public async Task<IActionResult> Delete(int horseId, CancellationToken cancellationToken)
     {

@@ -19,9 +19,24 @@ public static class DependencyInjection
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IHorseRepository, HorseRepository>();
+        services.AddScoped<IHorseHealthStatusRepository, HorseHealthStatusRepository>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
-        services.AddSingleton<IHorsePhotoStorage, CloudinaryHorsePhotoStorage>();
+
+        var cloudinary = configuration.GetSection(CloudinarySettings.SectionName).Get<CloudinarySettings>();
+        var useCloudinary = cloudinary is not null
+            && !string.IsNullOrWhiteSpace(cloudinary.CloudName)
+            && !string.IsNullOrWhiteSpace(cloudinary.ApiKey)
+            && !string.IsNullOrWhiteSpace(cloudinary.ApiSecret);
+
+        if (useCloudinary)
+        {
+            services.AddSingleton<IHorsePhotoStorage, CloudinaryHorsePhotoStorage>();
+        }
+        else
+        {
+            services.AddSingleton<IHorsePhotoStorage, LocalHorsePhotoStorage>();
+        }
 
         return services;
     }

@@ -20,6 +20,10 @@ public static class HorseMapper
             DongDoi = ExtractPedigree(horse.Description),
             OwnerID = horse.UserId,
             PhotoUrl = horse.ImageUrl,
+            GioiTinh = horse.Gender,
+            MauLong = horse.Color,
+            NgaySinh = FormatNgaySinhIso(horse.DateOfBirth),
+            ChieuCao = horse.Height,
         };
     }
 
@@ -30,7 +34,10 @@ public static class HorseMapper
             HorseName = request.Ten.Trim(),
             Breed = request.Giong.Trim(),
             Weight = request.CanNang,
-            DateOfBirth = AgeToDateOfBirth(request.Tuoi),
+            Gender = NormalizeOptional(request.GioiTinh),
+            Color = NormalizeOptional(request.MauLong),
+            Height = request.ChieuCao,
+            DateOfBirth = ResolveDateOfBirth(request.NgaySinh, request.Tuoi),
             Description = BuildDescription(request.DongDoi),
             UserId = request.OwnerID,
             HorseStatus = DefaultStatus,
@@ -43,10 +50,30 @@ public static class HorseMapper
         horse.HorseName = request.Ten.Trim();
         horse.Breed = request.Giong.Trim();
         horse.Weight = request.CanNang;
-        horse.DateOfBirth = AgeToDateOfBirth(request.Tuoi);
+        horse.Gender = NormalizeOptional(request.GioiTinh);
+        horse.Color = NormalizeOptional(request.MauLong);
+        horse.Height = request.ChieuCao;
+        horse.DateOfBirth = ResolveDateOfBirth(request.NgaySinh, request.Tuoi);
         horse.Description = BuildDescription(request.DongDoi);
         horse.UserId = request.OwnerID;
         horse.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? FormatNgaySinhIso(DateOnly? dateOfBirth) =>
+        dateOfBirth?.ToString("yyyy-MM-dd");
+
+    private static DateOnly? ResolveDateOfBirth(string? ngaySinh, int tuoi)
+    {
+        if (!string.IsNullOrWhiteSpace(ngaySinh)
+            && DateOnly.TryParse(ngaySinh.Trim(), out var parsed))
+        {
+            return parsed;
+        }
+
+        return AgeToDateOfBirth(tuoi);
     }
 
     private static string BuildDescription(string dongDoi) =>

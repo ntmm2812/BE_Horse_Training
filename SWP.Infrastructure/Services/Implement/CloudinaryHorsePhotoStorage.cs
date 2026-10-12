@@ -53,10 +53,19 @@ public partial class CloudinaryHorsePhotoStorage : IHorsePhotoStorage
         }
 
         await using var stream = new MemoryStream(bytes);
+        return await UploadAsync(horseId, stream, mimeType, cancellationToken);
+    }
+
+    public async Task<string?> UploadAsync(
+        int horseId,
+        Stream stream,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
         var publicId = BuildPublicId(horseId);
         var uploadParams = new ImageUploadParams
         {
-            File = new FileDescription($"horse-{horseId}.{ExtensionFromMime(mimeType)}", stream),
+            File = new FileDescription($"horse-{horseId}.{ExtensionFromMime(contentType)}", stream),
             Folder = _settings.Folder,
             PublicId = publicId,
             Overwrite = true,
@@ -65,7 +74,7 @@ public partial class CloudinaryHorsePhotoStorage : IHorsePhotoStorage
         var uploadResult = await _cloudinary.UploadAsync(uploadParams, cancellationToken);
         if (uploadResult.Error is not null)
         {
-            throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            throw new InvalidOperationException($"Không upload được ảnh lên Cloudinary: {uploadResult.Error.Message}");
         }
 
         return uploadResult.SecureUrl?.ToString();
