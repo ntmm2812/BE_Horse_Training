@@ -26,10 +26,16 @@ public class TrainingPlanConfiguration : IEntityTypeConfiguration<TrainingPlan>
             .HasMaxLength(50)
             .IsUnicode(false);
         entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+        entity.Property(e => e.CreatedByUserId).HasColumnName("CreatedByUserID");
 
         entity.HasOne(d => d.Horse).WithMany(p => p.TrainingPlans)
             .HasForeignKey(d => d.HorseId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK__TrainingP__Horse__35BCFE0A");
+
+        entity.HasOne(d => d.CreatedByUser).WithMany()
+            .HasForeignKey(d => d.CreatedByUserId)
+            .OnDelete(DeleteBehavior.ClientSetNull)
+            .HasConstraintName("FK_TrainingPlans_CreatedByUser");
     }
 }

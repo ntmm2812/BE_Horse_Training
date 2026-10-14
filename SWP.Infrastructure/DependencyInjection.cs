@@ -20,6 +20,8 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IHorseRepository, HorseRepository>();
         services.AddScoped<IHorseHealthStatusRepository, HorseHealthStatusRepository>();
+        services.AddScoped<ITrainingPlanRepository, TrainingPlanRepository>();
+        services.AddScoped<ITrainingSessionRepository, TrainingSessionRepository>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 

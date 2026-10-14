@@ -29,7 +29,13 @@ public class TrainingPlan
 
     public int HorseId { get; set; }
 
+    public int? CreatedByUserId { get; set; }
+
     public virtual Horse Horse { get; set; } = null!;
+
+    public virtual User? CreatedByUser { get; set; }
+
+    public virtual ICollection<TrainingPlanPhase> Phases { get; set; } = new List<TrainingPlanPhase>();
 
     public virtual ICollection<TrainingSchedule> TrainingSchedules { get; set; } = new List<TrainingSchedule>();
 }

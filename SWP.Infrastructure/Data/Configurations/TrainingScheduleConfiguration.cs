@@ -31,6 +31,15 @@ public class TrainingScheduleConfiguration : IEntityTypeConfiguration<TrainingSc
             .HasMaxLength(50)
             .IsUnicode(false);
         entity.Property(e => e.TrialVideoUrl).HasMaxLength(500);
+        entity.Property(e => e.PhaseId).HasColumnName("PhaseID");
+        entity.Property(e => e.Surface)
+            .HasMaxLength(30)
+            .IsUnicode(false);
+        entity.Property(e => e.ActualDistanceKm).HasColumnType("decimal(8, 2)");
+        entity.Property(e => e.AvgHeartRate).HasColumnType("decimal(6, 2)");
+        entity.Property(e => e.MaxHeartRate).HasColumnType("decimal(6, 2)");
+        entity.Property(e => e.AvgSpeedKmh).HasColumnType("decimal(6, 2)");
+        entity.Property(e => e.TrainerComment).HasMaxLength(1000);
 
         entity.HasOne(d => d.AssignedToUser).WithMany(p => p.TrainingSchedules)
             .HasForeignKey(d => d.AssignedToUserId)
@@ -40,5 +49,10 @@ public class TrainingScheduleConfiguration : IEntityTypeConfiguration<TrainingSc
             .HasForeignKey(d => d.PlanId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK__TrainingS__PlanI__38996AB5");
+
+        entity.HasOne(d => d.Phase).WithMany(p => p.TrainingSchedules)
+            .HasForeignKey(d => d.PhaseId)
+            .OnDelete(DeleteBehavior.ClientSetNull)
+            .HasConstraintName("FK_TrainingSchedule_TrainingPlanPhase");
     }
 }

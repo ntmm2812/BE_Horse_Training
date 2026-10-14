@@ -33,11 +33,29 @@ public class TrainingSchedule
 
     public string? TrialVideoUrl { get; set; }
 
+    public string? Surface { get; set; }
+
+    public decimal? ActualDistanceKm { get; set; }
+
+    public int? ActualDurationMinutes { get; set; }
+
+    public decimal? AvgHeartRate { get; set; }
+
+    public decimal? MaxHeartRate { get; set; }
+
+    public decimal? AvgSpeedKmh { get; set; }
+
+    public string? TrainerComment { get; set; }
+
     public int PlanId { get; set; }
+
+    public int? PhaseId { get; set; }
 
     public int? AssignedToUserId { get; set; }
 
     public virtual User? AssignedToUser { get; set; }
 
     public virtual TrainingPlan Plan { get; set; } = null!;
+
+    public virtual TrainingPlanPhase? Phase { get; set; }
 }

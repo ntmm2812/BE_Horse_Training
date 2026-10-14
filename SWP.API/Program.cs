@@ -111,27 +111,33 @@ namespace SWP.API
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                db.Database.ExecuteSqlRaw("""
-                    IF COL_LENGTH('Horse', 'ImageURL') IS NULL
-                        ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
+                // Script T-SQL chỉ chạy trên SQL Server (test tích hợp dùng SQLite in-memory).
+                if (db.Database.IsSqlServer())
+                {
+                    db.Database.ExecuteSqlRaw("""
+                        IF COL_LENGTH('Horse', 'ImageURL') IS NULL
+                            ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
 
-                    IF OBJECT_ID(N'HorseHealthStatus', N'U') IS NULL
-                    BEGIN
-                        CREATE TABLE [HorseHealthStatus] (
-                            [HorseID] INT NOT NULL PRIMARY KEY,
-                            [TrangThai] NVARCHAR(30) NOT NULL,
-                            [NgayCapNhat] DATETIME NOT NULL,
-                            CONSTRAINT [FK_HorseHealthStatus_Horse] FOREIGN KEY ([HorseID]) REFERENCES [Horse]([HorseID]) ON DELETE CASCADE
+                        IF OBJECT_ID(N'HorseHealthStatus', N'U') IS NULL
+                        BEGIN
+                            CREATE TABLE [HorseHealthStatus] (
+                                [HorseID] INT NOT NULL PRIMARY KEY,
+                                [TrangThai] NVARCHAR(30) NOT NULL,
+                                [NgayCapNhat] DATETIME NOT NULL,
+                                CONSTRAINT [FK_HorseHealthStatus_Horse] FOREIGN KEY ([HorseID]) REFERENCES [Horse]([HorseID]) ON DELETE CASCADE
+                            );
+                        END;
+
+                        INSERT INTO [HorseHealthStatus] ([HorseID], [TrangThai], [NgayCapNhat])
+                        SELECT h.[HorseID], N'Đủ điều kiện', GETUTCDATE()
+                        FROM [Horse] h
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM [HorseHealthStatus] s WHERE s.[HorseID] = h.[HorseID]
                         );
-                    END;
+                        """);
 
-                    INSERT INTO [HorseHealthStatus] ([HorseID], [TrangThai], [NgayCapNhat])
-                    SELECT h.[HorseID], N'Đủ điều kiện', GETUTCDATE()
-                    FROM [Horse] h
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM [HorseHealthStatus] s WHERE s.[HorseID] = h.[HorseID]
-                    );
-                    """);
+                    TrainingSchemaUpdater.Apply(db);
+                }
             }
 
             var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
