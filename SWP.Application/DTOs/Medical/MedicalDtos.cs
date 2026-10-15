@@ -53,7 +53,7 @@ public class ReleaseTrainingLockRequestDto
 {
     public string NewStatus { get; set; } = string.Empty;
     public string ReleaseReason { get; set; } = string.Empty;
-    public int ReexamRecordId { get; set; }
+    public int? ReexamRecordId { get; set; }
 }
 
 public class VaccinationScheduleDto

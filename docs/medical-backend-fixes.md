@@ -29,9 +29,9 @@ HLV tiếp tục dùng API đánh giá thể trạng của trainer để xem kh�
 }
 ```
 
-Thay `123` bằng ID bệnh án tái khám thực tế. Bệnh án phải thuộc đúng ngựa, đã hoàn tất, mới nhất theo ngày khám/ID, có ngày từ ngày đặt khóa đến hôm nay. Lý do dài 5–500 ký tự. Trạng thái mới nhận `Cần theo dõi`, `Đủ điều kiện` hoặc nhãn cũ `Tốt`.
+`releaseReason` và `reexamRecordId` là tùy chọn để khớp frontend, vốn chỉ gửi `newStatus`. Lý do để trống thì lưu lý do mặc định; nếu có nhập thì dài 5–500 ký tự. Nếu có `reexamRecordId`, bệnh án phải thuộc đúng ngựa, đã hoàn tất, mới nhất theo ngày khám/ID, có ngày từ ngày đặt khóa đến hôm nay. Khóa thuộc hồ sơ chấn thương (`InjuryCaseId` khác NULL) luôn bắt buộc `reexamRecordId` và bệnh án phải được gắn vào đúng hồ sơ. Trạng thái mới nhận `Cần theo dõi`, `Đủ điều kiện` hoặc nhãn cũ `Tốt`.
 
-Response bổ sung `releasedByUserId`, `releaseReason`, `reexamRecordId`. Request cũ chỉ có `newStatus` sẽ trả `400`. Frontend hiện dùng mock riêng nên bản sửa này không thay đổi luồng mock; khi chuyển sang API thật cần gửi đủ các trường trên.
+Response bổ sung `releasedByUserId`, `releaseReason`, `reexamRecordId`. Người mở khóa luôn lấy từ JWT, không lấy từ request.
 
 ## Thay đổi database
 
