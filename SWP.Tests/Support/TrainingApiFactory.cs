@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Persistence;
 using SWP.Infrastructure.Security.Interface;
@@ -38,6 +39,8 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
     {
         _connection.Open();
         builder.UseEnvironment("Development");
+        // Test không phụ thuộc quyền ghi Windows Event Log của máy chạy.
+        builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();

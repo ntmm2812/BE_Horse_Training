@@ -11,7 +11,7 @@ public static class MedicalMapper
         {
             RecordID = m.MedicalRecordId,
             HorseID = m.HorseId,
-            VetID = m.CreateBy ?? 2,
+            VetID = m.CreateBy,
             Ngay = m.RecordDate.ToString("yyyy-MM-dd"),
             ChanDoan = m.Diagnosis ?? string.Empty,
             PhacDo = m.Treatment ?? string.Empty,
@@ -23,12 +23,16 @@ public static class MedicalMapper
     {
         return new TrainingLockDto
         {
+            InjuryCaseId = l.InjuryCaseId,
             LockID = l.LockId,
             HorseID = l.HorseId,
             VetID = l.VetId,
             LyDo = l.LyDo,
             NgayDat = l.NgayDat.ToString("yyyy-MM-dd"),
-            NgayGo = l.NgayGo?.ToString("yyyy-MM-dd")
+            NgayGo = l.NgayGo?.ToString("yyyy-MM-dd"),
+            ReleasedByUserId = l.ReleasedByUserId,
+            ReleaseReason = l.ReleaseReason,
+            ReexamRecordId = l.ReexamRecordId
         };
     }
 
@@ -74,7 +78,7 @@ public static class MedicalMapper
         return new TrainingLock
         {
             HorseId = request.HorseID,
-            VetId = vetId > 0 ? vetId : 2,
+            VetId = vetId,
             LyDo = request.LyDo.Trim(),
             NgayDat = DateOnly.Parse(request.NgayDat),
             NgayGo = null
