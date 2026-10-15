@@ -21,7 +21,4 @@ SWP.API/appsettings.json
 *.p12
 *.key
 
-# Documentation (local only, do not push to git)
-docs/
-doc/
 *.doc
