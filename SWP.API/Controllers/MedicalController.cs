@@ -1,0 +1,313 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SWP.Application.DTOs.Medical;
+using SWP.Application.Services.Interface;
+
+namespace SWP.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class MedicalController : ControllerBase
+{
+    private readonly IMedicalService _medicalService;
+
+    public MedicalController(IMedicalService medicalService)
+    {
+        _medicalService = medicalService;
+    }
+
+    // ==================== BỆNH ÁN (MEDICALRECORD) ====================
+
+    [HttpGet("records")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetRecords([FromQuery] int? horseId, CancellationToken cancellationToken)
+    {
+        var records = await _medicalService.GetMedicalRecordsAsync(horseId, cancellationToken);
+        return Ok(records);
+    }
+
+    [HttpGet("records/{recordId:int}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetRecordById(int recordId, CancellationToken cancellationToken)
+    {
+        var record = await _medicalService.GetMedicalRecordByIdAsync(recordId, cancellationToken);
+        if (record is null)
+        {
+            return NotFound(new { message = "Không tìm thấy bệnh án." });
+        }
+        return Ok(record);
+    }
+
+    [HttpGet("records/latest-exam/{horseId:int}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetLatestExamDate(int horseId, CancellationToken cancellationToken)
+    {
+        var result = await _medicalService.GetLatestExamDateAsync(horseId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("records")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CreateRecord([FromBody] SaveMedicalRecordRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var vetId = GetCurrentUserIdOrDefault();
+            var result = await _medicalService.CreateMedicalRecordAsync(request, vetId, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("records/{recordId:int}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> UpdateRecord(int recordId, [FromBody] SaveMedicalRecordRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var vetId = GetCurrentUserIdOrDefault();
+            var result = await _medicalService.UpdateMedicalRecordAsync(recordId, request, vetId, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ==================== LỆNH KHÓA HUẤN LUYỆN (TRAININGLOCK) ====================
+
+    [HttpGet("training-locks")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetTrainingLocks(CancellationToken cancellationToken)
+    {
+        var locks = await _medicalService.GetTrainingLocksAsync(cancellationToken);
+        return Ok(locks);
+    }
+
+    [HttpGet("training-locks/active")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetActiveTrainingLocks(CancellationToken cancellationToken)
+    {
+        var locks = await _medicalService.GetActiveTrainingLocksAsync(cancellationToken);
+        return Ok(locks);
+    }
+
+    [HttpPost("training-locks")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CreateTrainingLock([FromBody] CreateTrainingLockRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var vetId = GetCurrentUserIdOrDefault();
+            var result = await _medicalService.CreateTrainingLockAsync(request, vetId, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("training-locks/{lockId:int}/release")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ReleaseTrainingLock(int lockId, [FromBody] ReleaseTrainingLockRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _medicalService.ReleaseTrainingLockAsync(lockId, request.NewStatus, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ==================== LỊCH TIÊM PHÒNG / TẨY GIUN (VACCINATIONSCHEDULE) ====================
+
+    [HttpGet("vaccinations")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetVaccinations([FromQuery] int? horseId, CancellationToken cancellationToken)
+    {
+        var list = await _medicalService.GetVaccinationsAsync(horseId, cancellationToken);
+        return Ok(list);
+    }
+
+    [HttpGet("vaccinations/{scheduleId:int}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetVaccinationById(int scheduleId, CancellationToken cancellationToken)
+    {
+        var item = await _medicalService.GetVaccinationByIdAsync(scheduleId, cancellationToken);
+        if (item is null)
+        {
+            return NotFound(new { message = "Không tìm thấy lịch tiêm." });
+        }
+        return Ok(item);
+    }
+
+    [HttpPost("vaccinations")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CreateVaccination([FromBody] SaveVaccinationRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _medicalService.CreateVaccinationAsync(request, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("vaccinations/{scheduleId:int}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> UpdateVaccination(int scheduleId, [FromBody] SaveVaccinationRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _medicalService.UpdateVaccinationAsync(scheduleId, request, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("vaccinations/{scheduleId:int}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DeleteVaccination(int scheduleId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _medicalService.DeleteVaccinationAsync(scheduleId, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("vaccinations/{scheduleId:int}/mark-done")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MarkVaccinated(int scheduleId, [FromBody] MarkVaccinatedRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _medicalService.MarkVaccinatedAsync(scheduleId, request?.NextDate, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ==================== BÁC SĨ THÚ Y (VETS) ====================
+
+    [HttpGet("vets")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetVets(CancellationToken cancellationToken)
+    {
+        var vets = await _medicalService.GetVetsAsync(cancellationToken);
+        return Ok(vets);
+    }
+
+    private int GetCurrentUserIdOrDefault()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!string.IsNullOrWhiteSpace(sub) && int.TryParse(sub, out var userId) && userId > 0)
+        {
+            return userId;
+        }
+
+        // Fallback mặc định cho Vet ID trong DB nếu chưa đăng nhập hoặc chạy local mock
+        return 2;
+    }
+}
