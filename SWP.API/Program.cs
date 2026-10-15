@@ -138,6 +138,7 @@ namespace SWP.API
 
                     TrainingSchemaUpdater.Apply(db);
                     MedicalSchemaUpdater.Apply(db);
+                    InjuryWorkflowSchemaUpdater.Apply(db);
                 }
             }
 

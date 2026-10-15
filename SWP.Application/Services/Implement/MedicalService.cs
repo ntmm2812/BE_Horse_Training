@@ -1,6 +1,7 @@
 using SWP.Application.Common;
 using SWP.Application.DTOs.Medical;
 using SWP.Application.Services.Interface;
+using SWP.Domain.Common;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Repositories.Interface;
 
@@ -52,6 +53,8 @@ public class MedicalService : IMedicalService
         CancellationToken cancellationToken = default)
     {
         ValidateExamForm(request);
+        ValidateVetId(vetId);
+        await using var transaction = await _medicalRepository.BeginTransactionAsync(cancellationToken);
 
         var horse = await _horseRepository.GetByIdAsync(request.HorseID, cancellationToken);
         if (horse is null) throw new ArgumentException("Không tìm thấy ngựa.");
@@ -67,7 +70,7 @@ public class MedicalService : IMedicalService
 
         TrainingLockDto? createdLock = null;
         var isLocked = await _medicalRepository.IsHorseLockedAsync(request.HorseID, cancellationToken);
-        if (ShouldAutoLock(request.Injuries, request.TrangThai, isLocked))
+        if (healthUpdated && ShouldAutoLock(request.Injuries, request.TrangThai, isLocked))
         {
             var reason = $"Chấn thương: {record.ViTriChanThuong} - {request.ChanDoan.Trim()}";
             if (reason.Length > 200) reason = reason[..199] + "…";
@@ -83,6 +86,7 @@ public class MedicalService : IMedicalService
             createdLock = MedicalMapper.ToDto(lockEntity);
         }
 
+        await transaction.CommitAsync(cancellationToken);
         return new MedicalRecordSaveResultDto
         {
             Record = MedicalMapper.ToDto(record),
@@ -98,14 +102,19 @@ public class MedicalService : IMedicalService
         CancellationToken cancellationToken = default)
     {
         ValidateExamForm(request);
+        ValidateVetId(vetId);
+        await using var transaction = await _medicalRepository.BeginTransactionAsync(cancellationToken);
 
         var record = await _medicalRepository.GetRecordByIdForUpdateAsync(recordId, cancellationToken)
             ?? throw new KeyNotFoundException("Không tìm thấy bệnh án");
 
-        if (record.CreateBy.HasValue && vetId > 0 && record.CreateBy.Value != vetId)
+        if (record.CreateBy != vetId)
         {
             throw new UnauthorizedAccessException("Bạn chỉ được sửa bệnh án do chính mình ghi");
         }
+
+        if (record.HorseId != request.HorseID)
+            throw new ArgumentException("Không được chuyển bệnh án sang ngựa khác.");
 
         MedicalMapper.ApplyUpdate(record, request);
 
@@ -118,7 +127,7 @@ public class MedicalService : IMedicalService
         {
             healthUpdated = await UpdateHorseHealthInternalAsync(record.HorseId, request.TrangThai.Trim(), record.RecordDate, cancellationToken);
             var isLocked = await _medicalRepository.IsHorseLockedAsync(record.HorseId, cancellationToken);
-            if (ShouldAutoLock(request.Injuries, request.TrangThai, isLocked))
+            if (healthUpdated && ShouldAutoLock(request.Injuries, request.TrangThai, isLocked))
             {
                 var reason = $"Chấn thương: {record.ViTriChanThuong} - {request.ChanDoan.Trim()}";
                 if (reason.Length > 200) reason = reason[..199] + "…";
@@ -128,7 +137,7 @@ public class MedicalService : IMedicalService
                     HorseID = record.HorseId,
                     LyDo = reason,
                     NgayDat = request.Ngay
-                }, vetId > 0 ? vetId : (record.CreateBy ?? 2));
+                }, vetId);
 
                 await _medicalRepository.AddLockAsync(lockEntity, cancellationToken);
                 createdLock = MedicalMapper.ToDto(lockEntity);
@@ -136,6 +145,7 @@ public class MedicalService : IMedicalService
         }
 
         await _medicalRepository.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return new MedicalRecordSaveResultDto
         {
@@ -162,6 +172,11 @@ public class MedicalService : IMedicalService
         int vetId,
         CancellationToken cancellationToken = default)
     {
+        ValidateVetId(vetId);
+        await using var transaction = await _medicalRepository.BeginTransactionAsync(cancellationToken);
+        if (await _horseRepository.GetByIdAsync(request.HorseID, cancellationToken) is null)
+            throw new ArgumentException("Không tìm thấy ngựa.");
+
         if (await _medicalRepository.IsHorseLockedAsync(request.HorseID, cancellationToken))
         {
             throw new InvalidOperationException("Ngựa này đang có lệnh khóa huấn luyện hiệu lực");
@@ -172,7 +187,7 @@ public class MedicalService : IMedicalService
             throw new ArgumentException("Ngày đặt không được ở tương lai");
         }
 
-        var reason = request.LyDo.Trim();
+        var reason = request.LyDo?.Trim() ?? "";
         if (reason.Length < 5 || reason.Length > 200)
         {
             throw new ArgumentException("Lý do không hợp lệ");
@@ -181,16 +196,28 @@ public class MedicalService : IMedicalService
         var lockEntity = MedicalMapper.ToEntity(request, vetId);
         await _medicalRepository.AddLockAsync(lockEntity, cancellationToken);
 
-        await UpdateHorseHealthInternalAsync(request.HorseID, "Đang điều trị", DateTime.UtcNow, cancellationToken);
+        // Khóa tập không được làm mất trạng thái cách ly đang có.
+        var health = await _healthRepository.GetByHorseIdAsync(request.HorseID, cancellationToken);
+        if (health?.TrangThai != HorseHealthStatuses.CachLy)
+            await UpdateHorseHealthInternalAsync(request.HorseID, HorseHealthStatuses.ChanThuong, DateTime.UtcNow, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
 
         return MedicalMapper.ToDto(lockEntity);
     }
 
     public async Task<TrainingLockDto> ReleaseTrainingLockAsync(
         int lockId,
-        string newStatus,
+        ReleaseTrainingLockRequestDto request,
+        int vetId,
         CancellationToken cancellationToken = default)
     {
+        ValidateVetId(vetId);
+        var newStatus = NormalizeHealthStatus(request.NewStatus);
+        var reason = request.ReleaseReason?.Trim() ?? "";
+        if (reason.Length < 5 || reason.Length > 500)
+            throw new ArgumentException("Lý do mở khóa phải có từ 5 đến 500 ký tự.");
+        await using var transaction = await _medicalRepository.BeginTransactionAsync(cancellationToken);
         var lockEntity = await _medicalRepository.GetLockByIdForUpdateAsync(lockId, cancellationToken)
             ?? throw new KeyNotFoundException("Không tìm thấy lệnh khóa");
 
@@ -199,16 +226,39 @@ public class MedicalService : IMedicalService
             throw new InvalidOperationException("Lệnh khóa này đã được gỡ");
         }
 
-        var validStatuses = new[] { "Cần theo dõi", "Tốt", "Đủ điều kiện" };
+        var validStatuses = new[] { HorseHealthStatuses.CanTheoDoi, HorseHealthStatuses.DuDieuKien };
         if (string.IsNullOrWhiteSpace(newStatus) || !validStatuses.Contains(newStatus.Trim(), StringComparer.OrdinalIgnoreCase))
         {
             throw new ArgumentException("Vui lòng chọn tình trạng sức khỏe mới hợp lệ");
         }
 
-        lockEntity.NgayGo = DateOnly.FromDateTime(DateTime.Today);
+        var reexam = await _medicalRepository.GetRecordByIdAsync(request.ReexamRecordId, cancellationToken);
+        if (reexam is null || reexam.HorseId != lockEntity.HorseId
+            || DateOnly.FromDateTime(reexam.RecordDate) < lockEntity.NgayDat
+            || reexam.RecordDate.Date > DateTime.Today
+            || reexam.Status != "Completed"
+            || !await _medicalRepository.IsLatestRecordAsync(reexam.HorseId, reexam.RecordDate, reexam.MedicalRecordId, cancellationToken))
+            throw new ArgumentException("Cần bệnh án tái khám hoàn tất mới nhất của đúng ngựa, từ ngày khóa đến hôm nay.");
 
-        await UpdateHorseHealthInternalAsync(lockEntity.HorseId, newStatus.Trim(), DateTime.UtcNow, cancellationToken);
+        if (lockEntity.InjuryCaseId is int caseId &&
+            !await _medicalRepository.IsExamLinkedToCaseAsync(caseId, reexam.MedicalRecordId, cancellationToken))
+            throw new ArgumentException("Bệnh án tái khám phải được gắn vào đúng hồ sơ chấn thương trước khi mở khóa.");
+
+        lockEntity.NgayGo = DateOnly.FromDateTime(DateTime.Today);
+        lockEntity.ReleasedByUserId = vetId;
+        lockEntity.ReleaseReason = reason;
+        lockEntity.ReexamRecordId = reexam.MedicalRecordId;
+        await _medicalRepository.TrackCaseLockReleaseAsync(lockEntity, vetId, cancellationToken);
+
+        // Lưu trong transaction trước khi truy vấn lại các khóa còn hiệu lực.
         await _medicalRepository.SaveChangesAsync(cancellationToken);
+        var horse = await _horseRepository.GetByIdAsync(lockEntity.HorseId, cancellationToken);
+        var health = await _healthRepository.GetByHorseIdAsync(lockEntity.HorseId, cancellationToken);
+        if (!await _medicalRepository.IsHorseLockedAsync(lockEntity.HorseId, cancellationToken)
+            && horse?.LockedAt is null && health?.TrangThai != HorseHealthStatuses.CachLy)
+            await UpdateHorseHealthInternalAsync(lockEntity.HorseId, newStatus, DateTime.UtcNow, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
 
         return MedicalMapper.ToDto(lockEntity);
     }
@@ -369,7 +419,7 @@ public class MedicalService : IMedicalService
         var health = await _healthRepository.GetByHorseIdAsync(horseId, cancellationToken);
         if (health is null || date.Date >= health.NgayCapNhat.Date || date >= health.NgayCapNhat)
         {
-            await _healthRepository.UpsertAsync(horseId, trangThai, cancellationToken);
+            await _healthRepository.UpsertAsync(horseId, NormalizeHealthStatus(trangThai), cancellationToken);
             return true;
         }
 
@@ -379,14 +429,29 @@ public class MedicalService : IMedicalService
     private static bool ShouldAutoLock(List<string> injuries, string? trangThai, bool horseLocked)
     {
         var hasInjury = injuries.Count > 0 && !injuries.Contains("Không có chấn thương", StringComparer.OrdinalIgnoreCase);
-        return hasInjury && string.Equals(trangThai, "Đang điều trị", StringComparison.OrdinalIgnoreCase) && !horseLocked;
+        return hasInjury && NormalizeHealthStatus(trangThai) == HorseHealthStatuses.ChanThuong && !horseLocked;
     }
+
+    private static void ValidateVetId(int vetId)
+    {
+        if (vetId <= 0) throw new UnauthorizedAccessException("Cần đăng nhập bằng tài khoản bác sĩ thú y.");
+    }
+
+    // Nhận nhãn cũ để tương thích client, nhưng ghi trạng thái thống nhất vào DB.
+    private static string NormalizeHealthStatus(string? status) => status?.Trim() switch
+    {
+        HorseHealthStatuses.Tot => HorseHealthStatuses.DuDieuKien,
+        HorseHealthStatuses.DangDieuTri => HorseHealthStatuses.ChanThuong,
+        var value => value ?? ""
+    };
 
     private static void ValidateExamForm(SaveMedicalRecordRequestDto request)
     {
+        if (!string.IsNullOrWhiteSpace(request.TrangThai) && !HorseHealthStatuses.IsValid(request.TrangThai))
+            throw new ArgumentException("Trạng thái sức khỏe không hợp lệ.");
         if (request.HorseID <= 0) throw new ArgumentException("Vui lòng chọn ngựa.");
         if (string.IsNullOrWhiteSpace(request.Ngay)) throw new ArgumentException("Ngày khám không được để trống.");
-        if (!DateTime.TryParse(request.Ngay, out var d) || d > DateTime.Today.AddDays(1))
+        if (!DateTime.TryParse(request.Ngay, out var d) || d.Date > DateTime.Today)
         {
             throw new ArgumentException("Ngày khám không được ở tương lai");
         }
@@ -408,5 +473,7 @@ public class MedicalService : IMedicalService
         {
             throw new ArgumentException("Vị trí chấn thương không hợp lệ");
         }
+        if (MedicalMapper.FormatInjuries(request.Injuries).Length > 255)
+            throw new ArgumentException("Danh sách vị trí chấn thương không được vượt quá 255 ký tự.");
     }
 }

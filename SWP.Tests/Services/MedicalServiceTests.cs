@@ -26,7 +26,7 @@ public class MedicalServiceTests : IDisposable
             TrangThai = "Đang điều trị"
         };
 
-        var result = await svc.CreateMedicalRecordAsync(request, _t.Ids.TrainerId);
+        var result = await svc.CreateMedicalRecordAsync(request, _t.Ids.VetId);
 
         Assert.NotNull(result.Record);
         Assert.Equal(horseId, result.Record.HorseID);
@@ -58,7 +58,7 @@ public class MedicalServiceTests : IDisposable
             TrangThai = "Tốt"
         };
 
-        var result = await svc.CreateMedicalRecordAsync(request, _t.Ids.TrainerId);
+        var result = await svc.CreateMedicalRecordAsync(request, _t.Ids.VetId);
 
         Assert.NotNull(result.Record);
         Assert.Null(result.Lock);
@@ -82,7 +82,7 @@ public class MedicalServiceTests : IDisposable
             Injuries = ["Không có chấn thương"]
         };
 
-        await Assert.ThrowsAsync<ArgumentException>(() => svc.CreateMedicalRecordAsync(request, _t.Ids.TrainerId));
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.CreateMedicalRecordAsync(request, _t.Ids.VetId));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class MedicalServiceTests : IDisposable
             HorseID = horseId,
             LyDo = "Viêm gân nhẹ chân trước",
             NgayDat = DateTime.Today.ToString("yyyy-MM-dd")
-        }, _t.Ids.TrainerId);
+        }, _t.Ids.VetId);
 
         Assert.NotNull(lockDto);
         Assert.Equal(horseId, lockDto.HorseID);
@@ -104,7 +104,7 @@ public class MedicalServiceTests : IDisposable
 
         // Check health status changed to "Đang điều trị"
         var health = _t.Db(db => db.HorseHealthStatuses.First(h => h.HorseId == horseId));
-        Assert.Equal("Đang điều trị", health.TrangThai);
+        Assert.Equal("Chấn thương", health.TrangThai);
     }
 
     [Fact]
@@ -118,15 +118,32 @@ public class MedicalServiceTests : IDisposable
             HorseID = horseId,
             LyDo = "Sưng nhẹ khớp cổ chân",
             NgayDat = DateTime.Today.ToString("yyyy-MM-dd")
-        }, _t.Ids.TrainerId);
+        }, _t.Ids.VetId);
 
-        var released = await svc.ReleaseTrainingLockAsync(lockDto.LockID, "Tốt");
+        var exam = await svc.CreateMedicalRecordAsync(new SaveMedicalRecordRequestDto
+        {
+            HorseID = horseId,
+            Ngay = DateTime.Today.ToString("yyyy-MM-dd"),
+            ChanDoan = "Tái khám, vận động đã hồi phục",
+            PhacDo = "Theo dõi vận động sau khi mở khóa",
+            Injuries = ["Không có chấn thương"]
+        }, _t.Ids.VetId);
+        var released = await svc.ReleaseTrainingLockAsync(lockDto.LockID, new ReleaseTrainingLockRequestDto
+        {
+            NewStatus = "Tốt",
+            ReleaseReason = "Đã tái khám và đủ điều kiện tập",
+            ReexamRecordId = exam.Record.RecordID
+        }, _t.Ids.VetId);
 
         Assert.NotNull(released.NgayGo);
         Assert.Equal(DateTime.Today.ToString("yyyy-MM-dd"), released.NgayGo);
 
         var health = _t.Db(db => db.HorseHealthStatuses.First(h => h.HorseId == horseId));
-        Assert.Equal("Tốt", health.TrangThai);
+        Assert.Equal("Đủ điều kiện", health.TrangThai);
+        Assert.Equal(_t.Ids.VetId, released.ReleasedByUserId);
+        Assert.Equal(exam.Record.RecordID, released.ReexamRecordId);
+        Assert.Equal("Đã tái khám và đủ điều kiện tập", released.ReleaseReason);
+        Assert.False((await _t.FitnessService().GetAssessmentAsync(horseId))!.IsTrainingLocked);
     }
 
     [Fact]

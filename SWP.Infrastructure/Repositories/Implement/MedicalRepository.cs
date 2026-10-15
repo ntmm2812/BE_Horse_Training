@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Data;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Persistence;
 using SWP.Infrastructure.Repositories.Interface;
@@ -13,6 +15,33 @@ public class MedicalRepository : IMedicalRepository
     {
         _context = context;
     }
+
+    public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+    public Task<bool> IsExamLinkedToCaseAsync(int caseId, int recordId, CancellationToken cancellationToken = default) =>
+        _context.InjuryCaseEvents.AnyAsync(e => e.InjuryCaseId == caseId && e.MedicalRecordId == recordId, cancellationToken);
+
+    public async Task TrackCaseLockReleaseAsync(TrainingLock trainingLock, int userId, CancellationToken cancellationToken = default)
+    {
+        if (trainingLock.InjuryCaseId is not int id) return;
+        var injury = await _context.InjuryCases.SingleAsync(c => c.InjuryCaseId == id, cancellationToken);
+        injury.Version++;
+        injury.UpdatedAt = DateTime.UtcNow;
+        _context.InjuryCaseEvents.Add(new InjuryCaseEvent
+        {
+            InjuryCaseId = id, ActorUserId = userId, Kind = "TrainingLockReleased", CreatedAt = injury.UpdatedAt,
+            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+            { trainingLock.LockId, trainingLock.ReleaseReason, trainingLock.ReexamRecordId })
+        });
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<TrainingLock?> GetActiveLockForHorseAsync(int horseId, CancellationToken cancellationToken = default) =>
+        _context.TrainingLocks.AsNoTracking()
+            .Where(l => l.HorseId == horseId && l.NgayGo == null)
+            .OrderByDescending(l => l.LockId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<MedicalRecord>> GetRecordsAsync(int? horseId, CancellationToken cancellationToken = default)
     {

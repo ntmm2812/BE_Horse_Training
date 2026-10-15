@@ -116,5 +116,5 @@ public sealed class TrainingTestContext : IDisposable
     }
 
     private HorseFitnessService FitnessService(ApplicationDbContext db) =>
-        new(new HorseRepository(db), new HorseHealthStatusRepository(db), new TrainingSessionRepository(db), Clock);
+        new(new HorseRepository(db), new HorseHealthStatusRepository(db), new TrainingSessionRepository(db), Clock, new MedicalRepository(db));
 }
