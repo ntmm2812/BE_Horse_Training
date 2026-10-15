@@ -54,4 +54,6 @@ public class User
     public virtual ICollection<Supply> Supplies { get; set; } = new List<Supply>();
 
     public virtual ICollection<TrainingSchedule> TrainingSchedules { get; set; } = new List<TrainingSchedule>();
+
+    public virtual ICollection<TrainingLock> TrainingLocks { get; set; } = new List<TrainingLock>();
 }
