@@ -38,7 +38,7 @@ public class MedicalApiTests : IClassFixture<TrainingApiFactory>
     }
 
     [Fact]
-    public async Task VetCanCreateLock_IdentityComesFromJwt_AndMissingReleaseEvidenceIsRejected()
+    public async Task VetCanCreateLock_IdentityComesFromJwt_AndReleaseAcceptsFrontendRequest()
     {
         var horseId = _factory.AddHorse("API medical lock");
         using var client = _factory.ClientAs(_factory.Ids.VetId, "Veterinarian");
@@ -50,8 +50,19 @@ public class MedicalApiTests : IClassFixture<TrainingApiFactory>
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         var created = (await response.Content.ReadFromJsonAsync<TrainingLockDto>())!;
         Assert.Equal(_factory.Ids.VetId, created.VetID);
-        var rejected = await client.PostAsJsonAsync($"/api/medical/training-locks/{created.LockID}/release", new { NewStatus = "Tốt" });
+
+        // Lý do có nhập nhưng quá ngắn thì vẫn bị từ chối, khóa giữ nguyên.
+        var rejected = await client.PostAsJsonAsync($"/api/medical/training-locks/{created.LockID}/release",
+            new { NewStatus = "Tốt", ReleaseReason = "ab" });
         Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
         Assert.Null(_factory.WithDb(db => db.TrainingLocks.Single(l => l.LockId == created.LockID).NgayGo));
+
+        // FE chỉ gửi newStatus: mở khóa thành công, người mở lấy từ JWT.
+        var released = await client.PostAsJsonAsync($"/api/medical/training-locks/{created.LockID}/release", new { NewStatus = "Tốt" });
+        Assert.True(released.StatusCode == HttpStatusCode.OK, await released.Content.ReadAsStringAsync());
+        var stored = _factory.WithDb(db => db.TrainingLocks.Single(l => l.LockId == created.LockID));
+        Assert.NotNull(stored.NgayGo);
+        Assert.Equal(_factory.Ids.VetId, stored.ReleasedByUserId);
+        Assert.Null(stored.ReexamRecordId);
     }
 }
