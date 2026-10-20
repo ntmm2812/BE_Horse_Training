@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Data.Configurations;
 
@@ -11,9 +11,13 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    protected ApplicationDbContext(DbContextOptions options) : base(options) { }
+
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
 
     public virtual DbSet<CareTask> CareTasks { get; set; }
+    public virtual DbSet<InjuryCase> InjuryCases { get; set; }
+    public virtual DbSet<InjuryCaseEvent> InjuryCaseEvents { get; set; }
 
     public virtual DbSet<FeedingPlan> FeedingPlans { get; set; }
 
@@ -50,6 +54,10 @@ public class ApplicationDbContext : DbContext
     public virtual DbSet<TrainingPlanPhase> TrainingPlanPhases { get; set; }
 
     public virtual DbSet<TrainingSchedule> TrainingSchedules { get; set; }
+
+    public virtual DbSet<TrainingLock> TrainingLocks { get; set; }
+
+    public virtual DbSet<VaccinationSchedule> VaccinationSchedules { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 

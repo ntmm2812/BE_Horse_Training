@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -23,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SWP.API\SWP.API.csproj" />
+    <None Update="Fixtures\OriginalDatabase.sql" TargetPath="OriginalDatabase.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -29,6 +29,7 @@ public class MedicalRecordConfiguration : IEntityTypeConfiguration<MedicalRecord
             .IsUnicode(false);
         entity.Property(e => e.Symptoms).HasMaxLength(1000);
         entity.Property(e => e.Treatment).HasMaxLength(1000);
+        entity.Property(e => e.ViTriChanThuong).HasMaxLength(255);
 
         entity.HasOne(d => d.CreateByNavigation).WithMany(p => p.MedicalRecords)
             .HasForeignKey(d => d.CreateBy)

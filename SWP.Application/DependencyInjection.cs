@@ -15,6 +15,8 @@ public static class DependencyInjection
         services.AddScoped<IHorseFitnessService, HorseFitnessService>();
         services.AddScoped<ITrainingPlanService, TrainingPlanService>();
         services.AddScoped<ITrainingSessionService, TrainingSessionService>();
+        services.AddScoped<IMedicalService, MedicalService>();
+        services.AddScoped<InjuryWorkflowService>();
         services.TryAddSingleton(TimeProvider.System);
         return services;
     }

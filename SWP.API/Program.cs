@@ -4,9 +4,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SWP.Application;
+using SWP.Application.Services.Implement;
+using SWP.Application.Services.Interface;
 using SWP.Infrastructure;
 using SWP.Infrastructure.Options;
 using SWP.Infrastructure.Persistence;
+using SWP.Infrastructure.Repositories.Implement;
 
 namespace SWP.API
 {
@@ -23,6 +26,16 @@ namespace SWP.API
 
             builder.Services.AddApplication();
             builder.Services.AddInfrastructure(builder.Configuration);
+
+            builder.Services.AddDbContext<OriginalCareDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+            builder.Services.AddScoped<IMedicalService>(services =>
+            {
+                var db = services.GetRequiredService<OriginalCareDbContext>();
+                return new MedicalService(new MedicalRepository(db), new HorseRepository(db),
+                    new HorseHealthStatusRepository(db));
+            });
+            builder.Services.AddScoped<CareService>();
 
             var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
                 ?? throw new InvalidOperationException("Thiếu cấu hình Jwt trong appsettings.");
@@ -108,37 +121,8 @@ namespace SWP.API
                     : "Ảnh ngựa: lưu local wwwroot/media (chưa đủ Cloudinary:ApiSecret — xem appsettings.Local.json).",
                 cloudinaryConfig?.Folder ?? "swp-horses");
 
-            using (var scope = app.Services.CreateScope())
-            {
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                // Script T-SQL chỉ chạy trên SQL Server (test tích hợp dùng SQLite in-memory).
-                if (db.Database.IsSqlServer())
-                {
-                    db.Database.ExecuteSqlRaw("""
-                        IF COL_LENGTH('Horse', 'ImageURL') IS NULL
-                            ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
-
-                        IF OBJECT_ID(N'HorseHealthStatus', N'U') IS NULL
-                        BEGIN
-                            CREATE TABLE [HorseHealthStatus] (
-                                [HorseID] INT NOT NULL PRIMARY KEY,
-                                [TrangThai] NVARCHAR(30) NOT NULL,
-                                [NgayCapNhat] DATETIME NOT NULL,
-                                CONSTRAINT [FK_HorseHealthStatus_Horse] FOREIGN KEY ([HorseID]) REFERENCES [Horse]([HorseID]) ON DELETE CASCADE
-                            );
-                        END;
-
-                        INSERT INTO [HorseHealthStatus] ([HorseID], [TrangThai], [NgayCapNhat])
-                        SELECT h.[HorseID], N'Đủ điều kiện', GETUTCDATE()
-                        FROM [Horse] h
-                        WHERE NOT EXISTS (
-                            SELECT 1 FROM [HorseHealthStatus] s WHERE s.[HorseID] = h.[HorseID]
-                        );
-                        """);
-
-                    TrainingSchemaUpdater.Apply(db);
-                }
-            }
+            // The existing database is managed separately. Starting the API must not
+            // create/alter tables or seed business data.
 
             var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
             Directory.CreateDirectory(Path.Combine(webRoot, "media", "swp-horses"));
