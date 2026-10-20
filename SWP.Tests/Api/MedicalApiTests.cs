@@ -13,7 +13,7 @@ public class MedicalApiTests : IClassFixture<TrainingApiFactory>
 
     public static IEnumerable<object[]> Routes => new[]
     {
-        ("GET", "records"), ("GET", "records/1"), ("GET", "records/latest-exam/1"),
+        ("GET", "incident-reports"), ("GET", "records"), ("GET", "records/1"), ("GET", "records/latest-exam/1"),
         ("POST", "records"), ("PUT", "records/1"),
         ("GET", "training-locks"), ("GET", "training-locks/active"),
         ("POST", "training-locks"), ("POST", "training-locks/1/release"),

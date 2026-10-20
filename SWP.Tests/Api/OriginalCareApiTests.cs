@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using SWP.Application.DTOs.Care;
 using SWP.Application.DTOs.Medical;
 using SWP.Domain.Models.Entity;
 using SWP.Tests.Support;
@@ -111,6 +112,62 @@ public class OriginalCareApiTests(OriginalCareApiFactory factory) : IClassFixtur
         var response = await groom.PostAsJsonAsync("/api/care/incident-reports", new { HorseID = horse, LoaiSuCo = type, Ngay = date, HinhAnh = photo });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.False(factory.WithDb(db => db.AuditLogs.Any(a => a.Action == "ReportIncident" && a.RecordId == horse)));
+    }
+
+    [Fact]
+    public async Task VetCanReadGroomIncidentsAndFilterByHorse()
+    {
+        var horseId = factory.AddHorse("Reported horse");
+        var otherHorseId = factory.AddHorse("Other reported horse");
+        using var groom = factory.Groom();
+        foreach (var id in new[] { horseId, otherHorseId })
+        {
+            var response = await groom.PostAsJsonAsync("/api/care/incident-reports",
+                new { HorseID = id, LoaiSuCo = "Bỏ ăn", Ngay = "2026-10-12" });
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
+
+        using var vet = factory.ClientAs(factory.Ids.VetId, "Veterinarian");
+        var reports = (await vet.GetFromJsonAsync<List<IncidentReportDto>>(
+            "/api/medical/incident-reports"))!;
+        Assert.Contains(reports, r => r.HorseID == horseId && r.GroomID == factory.Ids.GroomId);
+        Assert.Contains(reports, r => r.HorseID == otherHorseId);
+        var filtered = (await vet.GetFromJsonAsync<List<IncidentReportDto>>(
+            $"/api/medical/incident-reports?horseId={horseId}"))!;
+        Assert.Single(filtered);
+        Assert.Equal(horseId, filtered[0].HorseID);
+        Assert.Equal(HttpStatusCode.Forbidden, (await groom.GetAsync("/api/medical/incident-reports")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Medical", "Pending")]
+    [InlineData("medical", "InProgress")]
+    [InlineData(" Medical ", "Scheduled")]
+    public async Task OriginalSchemaMedicalTasksCannotUseDailyCareCompletion(string type, string status)
+    {
+        var horseId = factory.AddHorse("Medical task horse");
+        var taskId = factory.WithDb(db =>
+        {
+            var task = new CareTask { HorseId = horseId, UserId = factory.Ids.GroomId,
+                TaskName = "Theo dõi chấn thương", TaskType = type, Status = status,
+                ScheduledAt = TestData.Today.ToDateTime(new TimeOnly(6, 0)), CreatedAt = TestData.Now.UtcDateTime };
+            db.CareTasks.Add(task);
+            var stable = new Stable { StableName = "Medical test stable", Status = "Active", CreatedAt = TestData.Now.UtcDateTime };
+            db.StableAssignments.Add(new StableAssignment { HorseId = horseId, Stable = stable,
+                Status = "Active", StartDate = TestData.Now.DateTime.AddDays(-1) });
+            db.SaveChanges();
+            return task.CareTaskId;
+        });
+        using var groom = factory.Groom();
+        var tasks = (await groom.GetFromJsonAsync<List<CareTaskDto>>("/api/care/tasks"))!;
+        Assert.DoesNotContain(tasks, t => t.TaskID == taskId);
+        var stables = (await groom.GetFromJsonAsync<List<StableAssignmentDto>>("/api/care/stable-assignments"))!;
+        Assert.Empty(stables.Single(s => s.HorseID == horseId).LichSinhHoat);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await groom.PostAsJsonAsync($"/api/care/tasks/{taskId}/complete", new { })).StatusCode);
+        var stored = factory.WithDb(db => db.CareTasks.AsNoTracking().Single(t => t.CareTaskId == taskId));
+        Assert.Equal(status, stored.Status);
+        Assert.Null(stored.CompletedAt);
     }
 
     [Fact]

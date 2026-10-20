@@ -73,3 +73,29 @@ Medical, training và injury dùng chung `ApplicationDbContext` để giữ liê
 khóa tập và hồ sơ chấn thương. `OriginalCareDbContext` chỉ phục vụ API chăm sóc hằng ngày
 trên các cột gốc; không dùng context này thay cho service y tế vì sẽ mất thông tin liên kết
 và điều kiện tái khám khi mở khóa.
+
+## Luồng Groom và phối hợp với bác sĩ
+
+Các API `/api/care/*` yêu cầu JWT role `groom`. ID nhân viên lấy từ tài khoản đăng nhập;
+tham số `groomId` chỉ được dùng để xem dữ liệu của chính mình.
+
+| API | Chức năng |
+| --- | --- |
+| `GET /api/care/tasks` | Công việc hằng ngày được giao, loại trừ công việc `Medical` |
+| `POST /api/care/tasks/{taskId}/complete` | Xác nhận việc của mình; trả 409 nếu là việc y tế hoặc đã hoàn thành |
+| `GET /api/care/stable-assignments`, `GET /api/care/stable-numbers` | Phân chuồng và lịch chăm sóc hằng ngày |
+| `GET /api/care/feeding-plans` | Khẩu phần đang áp dụng, giữ chi tiết thức ăn và đơn vị |
+| `GET /api/care/supplies` | Vật tư và số lượng tồn kho |
+| `POST /api/care/incident-reports` | Gửi sự cố, lưu người báo cáo theo JWT vào `AuditLog` |
+| `GET /api/care/incident-reports` | Các sự cố do chính Groom gửi |
+| `GET /api/medical/incident-reports?horseId=...` | Bác sĩ đọc báo cáo của Groom; `horseId` là bộ lọc tùy chọn |
+
+Báo cáo sự cố không tự tạo bệnh án, hồ sơ chấn thương hoặc khóa tập. Bác sĩ xem báo cáo
+và sử dụng luồng medical/injury để đánh giá, lập hồ sơ và giao việc khi cần.
+
+Công việc y tế do bác sĩ giao có `TaskType = Medical` và đi qua
+`/api/injury-cases/care-tasks`: Groom bắt đầu việc (`/{id}/start`), rồi ghi kết quả
+(`/{id}/complete`) hoặc lý do không thực hiện được (`/{id}/unable`), gửi `Version`
+và `Notes` theo request của luồng này. API care hằng ngày không được dùng để hoàn thành
+việc y tế, kể cả khi công việc đang `InProgress`; trạng thái, phiên bản và lịch sử
+hồ sơ chấn thương được cập nhật trong luồng injury.

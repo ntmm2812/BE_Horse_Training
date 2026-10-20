@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using SWP.Application.DTOs.Care;
 using SWP.Application.DTOs.Medical;
 using SWP.Tests.Support;
 
@@ -51,11 +52,22 @@ public class InjuryWorkflowApiTests(TrainingApiFactory factory) : IClassFixture<
         Assert.Equal(HttpStatusCode.Created, taskResponse.StatusCode);
         var task = (await taskResponse.Content.ReadFromJsonAsync<MedicalCareDto>())!;
         using var groom = factory.Groom();
+        var daily = (await groom.GetFromJsonAsync<List<CareTaskDto>>("/api/care/tasks"))!;
+        Assert.DoesNotContain(daily, t => t.TaskID == task.Id);
+        var eventsBefore = factory.WithDb(db => db.InjuryCaseEvents.Count(e => e.InjuryCaseId == injury.Id));
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await groom.PostAsJsonAsync($"/api/care/tasks/{task.Id}/complete", new { })).StatusCode);
+        Assert.Equal("Pending", factory.WithDb(db => db.CareTasks.Single(t => t.CareTaskId == task.Id).Status));
+        Assert.Equal(task.Version, factory.WithDb(db => db.CareTasks.Single(t => t.CareTaskId == task.Id).Version));
+        Assert.Equal(eventsBefore, factory.WithDb(db => db.InjuryCaseEvents.Count(e => e.InjuryCaseId == injury.Id)));
         var mine = (await groom.GetFromJsonAsync<PageDto<MedicalCareDto>>($"/api/injury-cases/care-tasks?caseId={injury.Id}"))!;
         Assert.Single(mine.Items);
         var start = await groom.PostAsJsonAsync($"/api/injury-cases/care-tasks/{task.Id}/start", new { task.Version });
         Assert.Equal(HttpStatusCode.OK, start.StatusCode);
         task = (await start.Content.ReadFromJsonAsync<MedicalCareDto>())!;
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await groom.PostAsJsonAsync($"/api/care/tasks/{task.Id}/complete", new { })).StatusCode);
+        Assert.Equal("InProgress", factory.WithDb(db => db.CareTasks.Single(t => t.CareTaskId == task.Id).Status));
         var complete = await groom.PostAsJsonAsync($"/api/injury-cases/care-tasks/{task.Id}/complete", new { task.Version, Notes = "Đã ghi nhận đầy đủ theo hướng dẫn" });
         Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await groom.GetAsync($"/api/injury-cases/{injury.Id}/timeline")).StatusCode);

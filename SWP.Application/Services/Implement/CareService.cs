@@ -20,9 +20,14 @@ public sealed class CareService(OriginalCareDbContext db, TimeProvider clock)
     private static readonly string[] IncidentTypes = ["Vết thương", "Khập khiễng", "Bỏ ăn", "Chuồng/thiết bị hỏng", "Khác"];
     private DateTime Now => clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime;
 
+    // InjuryWorkflowService marks every assigned clinical task as Medical.
+    // TaskType exists in the original schema, so this also works without extension columns.
+    private IQueryable<CareTask> DailyTasks => db.CareTasks
+        .Where(t => t.TaskType == null || t.TaskType.Trim().ToLower() != "medical");
+
     public async Task<List<CareTaskDto>> GetTasks(int groomId, CancellationToken ct)
     {
-        var tasks = await db.CareTasks.AsNoTracking()
+        var tasks = await DailyTasks.AsNoTracking()
             .Where(t => t.UserId == groomId && t.Status != "Cancelled")
             .OrderByDescending(t => t.ScheduledAt ?? t.CreatedAt).ThenBy(t => t.CareTaskId).ToListAsync(ct);
         return tasks.Select(ToTask).ToList();
@@ -33,6 +38,8 @@ public sealed class CareService(OriginalCareDbContext db, TimeProvider clock)
         var task = await db.CareTasks.SingleOrDefaultAsync(t => t.CareTaskId == id, ct)
             ?? throw new CareException(404, "Không tìm thấy công việc.");
         if (task.UserId != groomId) throw new CareException(403, "Bạn chỉ được xác nhận công việc của chính mình.");
+        if (string.Equals(task.TaskType?.Trim(), "Medical", StringComparison.OrdinalIgnoreCase))
+            throw new CareException(409, "Công việc y tế phải thực hiện qua luồng chăm sóc chấn thương, có bước bắt đầu và ghi kết quả.");
         if (task.Status is not ("Pending" or "InProgress" or "Scheduled"))
             throw new CareException(409, "Công việc đã hoàn thành, đã hủy hoặc không thể xác nhận.");
         task.Status = "Completed";
@@ -52,7 +59,7 @@ public sealed class CareService(OriginalCareDbContext db, TimeProvider clock)
             .OrderByDescending(a => a.StartDate).ThenByDescending(a => a.AssignmentId).ToListAsync(ct);
         var today = now.Date;
         var tomorrow = today.AddDays(1);
-        var tasks = await db.CareTasks.AsNoTracking()
+        var tasks = await DailyTasks.AsNoTracking()
             .Where(t => t.ScheduledAt >= today && t.ScheduledAt < tomorrow && t.Status != "Cancelled")
             .OrderBy(t => t.ScheduledAt).ThenBy(t => t.CareTaskId).ToListAsync(ct);
         return assignments.DistinctBy(a => a.HorseId).Select(a => new StableAssignmentDto(
@@ -109,15 +116,24 @@ public sealed class CareService(OriginalCareDbContext db, TimeProvider clock)
         .OrderBy(s => s.SupplyName).Select(s => new CareSupplyDto(s.SupplyId, s.SupplyName, s.Category,
             s.QuantityInStock, s.UserId, s.UnitPrice, s.Unit)).ToListAsync(ct);
 
-    public async Task<List<IncidentReportDto>> GetIncidents(int groomId, CancellationToken ct)
+    public Task<List<IncidentReportDto>> GetIncidents(int groomId, CancellationToken ct) =>
+        ReadIncidents(groomId, null, ct);
+
+    public Task<List<IncidentReportDto>> GetIncidentsForVet(int? horseId, CancellationToken ct) =>
+        ReadIncidents(null, horseId, ct);
+
+    private async Task<List<IncidentReportDto>> ReadIncidents(int? groomId, int? horseId, CancellationToken ct)
     {
-        var reports = await db.AuditLogs.AsNoTracking()
-            .Where(a => a.Action == IncidentAction && a.TableName == "Horse" && a.UserId == groomId)
+        var query = db.AuditLogs.AsNoTracking()
+            .Where(a => a.Action == IncidentAction && a.TableName == "Horse" && a.UserId != null);
+        if (groomId.HasValue) query = query.Where(a => a.UserId == groomId.Value);
+        if (horseId.HasValue) query = query.Where(a => a.RecordId == horseId.Value);
+        var reports = await query
             .OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.LogId).ToListAsync(ct);
         return reports.Select(a =>
         {
             var data = JsonSerializer.Deserialize<CreateIncidentReportRequest>(a.NewValue ?? "{}")!;
-            return new IncidentReportDto(a.LogId, a.RecordId ?? data.HorseID, groomId, data.LoaiSuCo,
+            return new IncidentReportDto(a.LogId, a.RecordId ?? data.HorseID, a.UserId!.Value, data.LoaiSuCo,
                 data.MoTa ?? "", data.HinhAnh ?? "", data.Ngay);
         }).OrderByDescending(r => r.Ngay).ThenByDescending(r => r.ReportID).ToList();
     }

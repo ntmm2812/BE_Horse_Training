@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
+using SWP.Application.DTOs.Care;
 using SWP.Application.DTOs.Medical;
+using SWP.Application.Services.Implement;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
 
@@ -43,6 +45,11 @@ public class MedicalController : ControllerBase
     }
 
     // ==================== BỆNH ÁN (MEDICALRECORD) ====================
+
+    [HttpGet("incident-reports")]
+    public Task<List<IncidentReportDto>> IncidentReports(
+        [FromServices] CareService service,
+        [FromQuery] int? horseId, CancellationToken ct) => service.GetIncidentsForVet(horseId, ct);
 
     [HttpGet("records/{recordId:int}/is-latest")]
     public Task<bool> IsLatest(int recordId, CancellationToken ct) => _medicalService.IsLatestMedicalRecordAsync(recordId, ct);
