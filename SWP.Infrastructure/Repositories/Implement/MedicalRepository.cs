@@ -24,6 +24,19 @@ public class MedicalRepository : IMedicalRepository
 
     public async Task TrackCaseLockReleaseAsync(TrainingLock trainingLock, int userId, CancellationToken cancellationToken = default)
     {
+        if (_context is OriginalCareDbContext)
+        {
+            // Release metadata belongs in the existing audit table, not new TrainingLock columns.
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "ReleaseTrainingLock", TableName = "TrainingLock", RecordId = trainingLock.LockId,
+                UserId = userId, CreatedAt = DateTime.UtcNow,
+                NewValue = System.Text.Json.JsonSerializer.Serialize(new
+                { trainingLock.NgayGo, trainingLock.ReleaseReason, trainingLock.ReexamRecordId })
+            });
+            await _context.SaveChangesAsync(cancellationToken);
+            return;
+        }
         if (trainingLock.InjuryCaseId is not int id) return;
         var injury = await _context.InjuryCases.SingleAsync(c => c.InjuryCaseId == id, cancellationToken);
         injury.Version++;

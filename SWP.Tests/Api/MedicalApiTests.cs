@@ -62,7 +62,7 @@ public class MedicalApiTests : IClassFixture<TrainingApiFactory>
         Assert.True(released.StatusCode == HttpStatusCode.OK, await released.Content.ReadAsStringAsync());
         var stored = _factory.WithDb(db => db.TrainingLocks.Single(l => l.LockId == created.LockID));
         Assert.NotNull(stored.NgayGo);
-        Assert.Equal(_factory.Ids.VetId, stored.ReleasedByUserId);
-        Assert.Null(stored.ReexamRecordId);
+        var audit = _factory.WithDb(db => db.AuditLogs.Single(a => a.Action == "ReleaseTrainingLock" && a.RecordId == created.LockID));
+        Assert.Equal(_factory.Ids.VetId, audit.UserId);
     }
 }

@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SWP.API\SWP.API.csproj" />
+    <None Update="Fixtures\OriginalDatabase.sql" TargetPath="OriginalDatabase.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

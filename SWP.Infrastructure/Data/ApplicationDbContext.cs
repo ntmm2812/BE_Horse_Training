@@ -11,6 +11,8 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    protected ApplicationDbContext(DbContextOptions options) : base(options) { }
+
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
 
     public virtual DbSet<CareTask> CareTasks { get; set; }

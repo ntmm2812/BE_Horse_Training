@@ -2,15 +2,37 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.EntityFrameworkCore;
 using SWP.Application.DTOs.Medical;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
 
 namespace SWP.API.Controllers;
 
+public sealed class MedicalExceptionFilter : IExceptionFilter
+{
+    public void OnException(ExceptionContext context)
+    {
+        var error = context.Exception switch
+        {
+            DbUpdateConcurrencyException => (409, "Dữ liệu đã thay đổi. Vui lòng tải lại."),
+            KeyNotFoundException ex => (404, ex.Message),
+            ArgumentException ex => (400, ex.Message),
+            UnauthorizedAccessException ex => (403, ex.Message),
+            InvalidOperationException ex => (409, ex.Message),
+            _ => (0, "")
+        };
+        if (error.Item1 == 0) return;
+        context.Result = new ObjectResult(new { message = error.Item2 }) { StatusCode = error.Item1 };
+        context.ExceptionHandled = true;
+    }
+}
+
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = RoleNames.Veterinarian)]
+[TypeFilter(typeof(MedicalExceptionFilter))]
 public class MedicalController : ControllerBase
 {
     private readonly IMedicalService _medicalService;
@@ -21,6 +43,13 @@ public class MedicalController : ControllerBase
     }
 
     // ==================== BỆNH ÁN (MEDICALRECORD) ====================
+
+    [HttpGet("records/{recordId:int}/is-latest")]
+    public Task<bool> IsLatest(int recordId, CancellationToken ct) => _medicalService.IsLatestMedicalRecordAsync(recordId, ct);
+
+    [HttpPut("horses/{horseId:int}/health")]
+    public Task<bool> UpdateHealth(int horseId, UpdateHealthStatusRequestDto request, CancellationToken ct) =>
+        _medicalService.UpdateHealthStatusAsync(horseId, request, ct);
 
     [HttpGet("records")]
     public async Task<IActionResult> GetRecords([FromQuery] int? horseId, CancellationToken cancellationToken)

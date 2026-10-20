@@ -16,8 +16,9 @@ using SWP.Infrastructure.Security.Interface;
 namespace SWP.Tests.Support;
 
 /// <summary> Chạy API thật (Program.cs) trên SQLite in-memory với đồng hồ cố định. </summary>
-public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
+public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
 {
+    protected virtual bool UseOriginalSchema => false;
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:;Foreign Keys=True");
@@ -47,6 +48,10 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
             services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection));
 
+            services.RemoveAll<DbContextOptions<OriginalCareDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<OriginalCareDbContext>>();
+            services.AddDbContext<OriginalCareDbContext>(options => options.UseSqlite(_connection));
+
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
         });
@@ -58,7 +63,7 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
     public T WithDb<T>(Func<ApplicationDbContext, T> action)
     {
         using var scope = Services.CreateScope();
-        return action(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+        return action(ResolveDb(scope.ServiceProvider));
     }
 
     public HttpClient Anonymous() => CreateClient();
@@ -101,9 +106,18 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
             }
 
             using var scope = Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var db = ResolveDb(scope.ServiceProvider);
             db.Database.EnsureCreated();
             _ids = TestData.SeedBasics(db);
         }
     }
+
+    private ApplicationDbContext ResolveDb(IServiceProvider services) => UseOriginalSchema
+        ? services.GetRequiredService<OriginalCareDbContext>()
+        : services.GetRequiredService<ApplicationDbContext>();
+}
+
+public sealed class OriginalCareApiFactory : TrainingApiFactory
+{
+    protected override bool UseOriginalSchema => true;
 }
