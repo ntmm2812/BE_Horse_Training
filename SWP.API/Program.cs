@@ -5,11 +5,9 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SWP.Application;
 using SWP.Application.Services.Implement;
-using SWP.Application.Services.Interface;
 using SWP.Infrastructure;
 using SWP.Infrastructure.Options;
 using SWP.Infrastructure.Persistence;
-using SWP.Infrastructure.Repositories.Implement;
 
 namespace SWP.API
 {
@@ -29,12 +27,6 @@ namespace SWP.API
 
             builder.Services.AddDbContext<OriginalCareDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-            builder.Services.AddScoped<IMedicalService>(services =>
-            {
-                var db = services.GetRequiredService<OriginalCareDbContext>();
-                return new MedicalService(new MedicalRepository(db), new HorseRepository(db),
-                    new HorseHealthStatusRepository(db));
-            });
             builder.Services.AddScoped<CareService>();
 
             var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()

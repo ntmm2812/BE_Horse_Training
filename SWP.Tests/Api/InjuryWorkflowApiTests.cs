@@ -94,6 +94,24 @@ public class InjuryWorkflowApiTests(TrainingApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task MedicalEndpointCannotReleaseInjuryLockWithoutLinkedReexam()
+    {
+        using var vet = factory.ClientAs(factory.Ids.VetId, "Veterinarian");
+        var response = await vet.PostAsJsonAsync("/api/injury-cases", CaseRequest());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var injury = (await response.Content.ReadFromJsonAsync<InjuryCaseDto>())!;
+        var locked = await vet.PostAsJsonAsync($"/api/injury-cases/{injury.Id}/training-locks",
+            new { injury.Version, Reason = "Chờ tái khám chấn thương" });
+        Assert.Equal(HttpStatusCode.Created, locked.StatusCode);
+        var lockId = factory.WithDb(db => db.TrainingLocks.Single(l => l.InjuryCaseId == injury.Id).LockId);
+
+        var release = await vet.PostAsJsonAsync($"/api/medical/training-locks/{lockId}/release", new { newStatus = "Tốt" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, release.StatusCode);
+        Assert.Null(factory.WithDb(db => db.TrainingLocks.Single(l => l.LockId == lockId).NgayGo));
+    }
+
+    [Fact]
     public async Task StaleVersionReturns409_AndSwaggerIncludesNewRoutes()
     {
         using var vet = factory.ClientAs(factory.Ids.VetId, "Veterinarian");

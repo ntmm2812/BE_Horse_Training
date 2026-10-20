@@ -33,6 +33,11 @@ Yêu cầu .NET 8 SDK và SQL Server.
 
 ## Chạy test
 
+Test chạy trên .NET 8, cùng phiên bản chính với API. Kiểm tra `dotnet --list-runtimes`
+có `Microsoft.NETCore.App 8.0.x` và `Microsoft.AspNetCore.App 8.0.x`.
+Nếu máy chỉ có .NET 10, cài thêm .NET 8 SDK/ASP.NET Core Runtime; không bật
+`RollForward=Major` để chạy bộ test ASP.NET Core 8 bằng runtime 10.
+
 ```powershell
 dotnet test BE_Horse_managerment.sln
 ```
@@ -59,4 +64,12 @@ Mọi API dưới `api/trainer/*` yêu cầu JWT của vai trò `head_trainer`.
 
 Danh mục mã và nhãn tiếng Việt cho dropdown: `GET api/trainer/training-plans/options`. Lỗi trả về dạng `{ message, code, details }` với `code` ∈ `NOT_FOUND` (404), `VALIDATION_ERROR` (400), `INVALID_STATUS`/`CONFLICT` (409), `HORSE_NOT_FIT` (422).
 
-Schema bổ sung (bảng `TrainingPlanPhase`, các cột mới của `TrainingPlans`/`TrainingSchedule`) được tạo tự động khi khởi động API trên SQL Server – xem `SWP.Infrastructure/Data/TrainingSchemaUpdater.cs`.
+API không tự tạo/sửa bảng hoặc seed dữ liệu khi khởi động. Database cần được chuẩn bị
+trước khi chạy các luồng nghiệp vụ. Các phần bổ sung schema được định nghĩa trong
+`SWP.Infrastructure/Data/TrainingSchemaUpdater.cs`, `MedicalSchemaUpdater.cs` và
+`Data/Sql/InjuryWorkflow.sql`; chỉ áp dụng có chủ đích trên database đã được sao lưu.
+
+Medical, training và injury dùng chung `ApplicationDbContext` để giữ liên kết bệnh án,
+khóa tập và hồ sơ chấn thương. `OriginalCareDbContext` chỉ phục vụ API chăm sóc hằng ngày
+trên các cột gốc; không dùng context này thay cho service y tế vì sẽ mất thông tin liên kết
+và điều kiện tái khám khi mở khóa.

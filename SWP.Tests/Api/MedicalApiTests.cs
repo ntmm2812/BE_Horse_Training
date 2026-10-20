@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using SWP.Application.DTOs.Medical;
 using SWP.Tests.Support;
 
@@ -65,4 +66,46 @@ public class MedicalApiTests : IClassFixture<TrainingApiFactory>
         var audit = _factory.WithDb(db => db.AuditLogs.Single(a => a.Action == "ReleaseTrainingLock" && a.RecordId == created.LockID));
         Assert.Equal(_factory.Ids.VetId, audit.UserId);
     }
+
+    [Fact]
+    public async Task ExamLockReleaseAndVaccinationUseSharedApplicationContext()
+    {
+        var horseId = _factory.AddHorse("Original medical horse");
+        using var vet = _factory.ClientAs(_factory.Ids.VetId, "Veterinarian");
+        var today = DateTime.Today.ToString("yyyy-MM-dd");
+        var response = await vet.PostAsJsonAsync("/api/medical/records", new
+        {
+            HorseID = horseId, Ngay = today, ChanDoan = "Chấn thương chân trước", PhacDo = "Nghỉ ngơi và theo dõi hằng ngày",
+            injuries = new[] { "Chân trước trái" }, TrangThai = "Đang điều trị", VetID = _factory.Ids.OwnerId
+        });
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var record = result.GetProperty("record");
+        var recordId = record.GetProperty("RecordID").GetInt32();
+        Assert.Equal(_factory.Ids.VetId, record.GetProperty("VetID").GetInt32());
+        Assert.True(await vet.GetFromJsonAsync<bool>($"/api/medical/records/{recordId}/is-latest"));
+        var lockId = result.GetProperty("lock").GetProperty("LockID").GetInt32();
+        var locks = await vet.GetFromJsonAsync<JsonElement>("/api/medical/training-locks/active");
+        Assert.Contains(locks.EnumerateArray(), l => l.GetProperty("LockID").GetInt32() == lockId);
+
+        var blocked = await vet.PutAsJsonAsync($"/api/medical/horses/{horseId}/health", new { TrangThai = "Tốt", Ngay = today });
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+        var released = await vet.PostAsJsonAsync($"/api/medical/training-locks/{lockId}/release", new { newStatus = "Tốt" });
+        Assert.True(released.IsSuccessStatusCode, await released.Content.ReadAsStringAsync());
+        Assert.NotNull(_factory.WithDb(db => db.TrainingLocks.Single(l => l.LockId == lockId).NgayGo));
+        Assert.True(_factory.WithDb(db => db.AuditLogs.Any(a => a.Action == "ReleaseTrainingLock" && a.RecordId == lockId && a.UserId == _factory.Ids.VetId)));
+
+        var vaccine = await vet.PostAsJsonAsync("/api/medical/vaccinations", new { HorseID = horseId, Loai = "Cúm ngựa", NgayHen = today });
+        Assert.Equal(HttpStatusCode.Created, vaccine.StatusCode);
+        var scheduleId = (await vaccine.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("ScheduleID").GetInt32();
+        var duplicate = await vet.PostAsJsonAsync("/api/medical/vaccinations", new { HorseID = horseId, Loai = "Cúm ngựa", NgayHen = today });
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        var done = await vet.PostAsJsonAsync($"/api/medical/vaccinations/{scheduleId}/mark-done", new { nextDate = DateTime.Today.AddDays(30).ToString("yyyy-MM-dd") });
+        Assert.True(done.IsSuccessStatusCode, await done.Content.ReadAsStringAsync());
+        var vaccineResult = await done.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Đã tiêm", vaccineResult.GetProperty("item").GetProperty("TrangThai").GetString());
+        Assert.Equal("Chờ tiêm", vaccineResult.GetProperty("next").GetProperty("TrangThai").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, (await vet.DeleteAsync($"/api/medical/vaccinations/{scheduleId}")).StatusCode);
+    }
+
 }

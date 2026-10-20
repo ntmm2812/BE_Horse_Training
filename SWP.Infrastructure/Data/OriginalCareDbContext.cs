@@ -4,8 +4,8 @@ using SWP.Domain.Models.Entity;
 namespace SWP.Infrastructure.Persistence;
 
 /// <summary>
-/// Medical and daily-care APIs use only the columns in Database/Dua ngua.sql.
-/// The extended training/injury model remains separate; this context never migrates a database.
+/// Daily-care queries use only the columns in Database/Dua ngua.sql.
+/// Medical, training and injury APIs share ApplicationDbContext; this context never migrates a database.
 /// </summary>
 public sealed class OriginalCareDbContext(DbContextOptions<OriginalCareDbContext> options)
     : ApplicationDbContext(options)
@@ -19,6 +19,11 @@ public sealed class OriginalCareDbContext(DbContextOptions<OriginalCareDbContext
         modelBuilder.Ignore<TrainingPlanPhase>();
 
         var care = modelBuilder.Entity<CareTask>();
+        // Remove the relationship first: ignoring only its CLR property lets EF
+        // recreate the foreign key as a shadow column absent from the original SQL.
+        foreach (var foreignKey in care.Metadata.GetForeignKeys()
+                     .Where(fk => fk.Properties.Any(p => p.Name == nameof(CareTask.AssignedByUserId))).ToList())
+            care.Metadata.RemoveForeignKey(foreignKey);
         care.Ignore(x => x.InjuryCaseId);
         care.Ignore(x => x.AssignedByUserId);
         care.Ignore(x => x.Version);
@@ -26,6 +31,10 @@ public sealed class OriginalCareDbContext(DbContextOptions<OriginalCareDbContext
         care.Property(x => x.Status).IsConcurrencyToken();
 
         var trainingLock = modelBuilder.Entity<TrainingLock>();
+        foreach (var foreignKey in trainingLock.Metadata.GetForeignKeys()
+                     .Where(fk => fk.Properties.Any(p => p.Name is nameof(TrainingLock.ReleasedByUserId)
+                         or nameof(TrainingLock.ReexamRecordId))).ToList())
+            trainingLock.Metadata.RemoveForeignKey(foreignKey);
         trainingLock.Ignore(x => x.InjuryCaseId);
         trainingLock.Ignore(x => x.ReleasedByUserId);
         trainingLock.Ignore(x => x.ReleaseReason);
