@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -37,7 +37,4 @@
     <ProjectReference Include="..\SWP.Domain\SWP.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Data\Sql\InjuryWorkflow.sql" />
-  </ItemGroup>
 </Project>

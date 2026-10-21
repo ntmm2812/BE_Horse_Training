@@ -24,7 +24,11 @@ public class OriginalCareApiTests(OriginalCareApiFactory factory) : IClassFixtur
                 .Select(c => c.Groups[1].Value).ToHashSet(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
         factory.WithDb(db =>
         {
-            foreach (var entity in db.Model.GetEntityTypes())
+            var careTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "CareTask", "Stable", "StableAssignment", "FeedingPlan", "FeedingPlanDetail", "Supply", "AuditLog"
+            };
+            foreach (var entity in db.Model.GetEntityTypes().Where(e => careTables.Contains(e.GetTableName()!)))
             {
                 var table = entity.GetTableName()!;
                 Assert.True(tables.ContainsKey(table), $"Table {table} is not in the original SQL.");
@@ -49,8 +53,35 @@ public class OriginalCareApiTests(OriginalCareApiFactory factory) : IClassFixtur
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/care/{route}")).StatusCode);
         using var owner = factory.ClientAs(factory.Ids.OwnerId, "Horse Owner");
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync($"/api/care/{route}")).StatusCode);
+        using var vet = factory.ClientAs(factory.Ids.VetId, "Veterinarian");
+        Assert.Equal(HttpStatusCode.Forbidden, (await vet.GetAsync($"/api/care/{route}")).StatusCode);
         using var groom = factory.Groom();
         Assert.Equal(HttpStatusCode.OK, (await groom.GetAsync($"/api/care/{route}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task DailyTasksFollowFrontendDateThenIdOrder()
+    {
+        var horseId = factory.AddHorse("Daily task order");
+        var expected = factory.WithDb(db =>
+        {
+            var first = new CareTask { HorseId = horseId, UserId = factory.Ids.GroomId,
+                TaskName = "Morning task", Status = "Pending", ScheduledAt = TestData.Now.Date.AddHours(6) };
+            var second = new CareTask { HorseId = horseId, UserId = factory.Ids.GroomId,
+                TaskName = "Evening task", Status = "Pending", ScheduledAt = TestData.Now.Date.AddHours(18) };
+            var earlier = new CareTask { HorseId = horseId, UserId = factory.Ids.GroomId,
+                TaskName = "Yesterday task", Status = "Completed", ScheduledAt = null,
+                CreatedAt = TestData.Now.Date.AddDays(-1) };
+            db.CareTasks.Add(first); db.SaveChanges();
+            db.CareTasks.Add(second); db.SaveChanges();
+            db.CareTasks.Add(earlier); db.SaveChanges();
+            return new[] { first.CareTaskId, second.CareTaskId, earlier.CareTaskId };
+        });
+        using var groom = factory.Groom();
+        var data = await groom.GetFromJsonAsync<JsonElement>("/api/care/tasks");
+        var actual = data.EnumerateArray().Where(t => t.GetProperty("HorseID").GetInt32() == horseId)
+            .Select(t => t.GetProperty("TaskID").GetInt32()).ToArray();
+        Assert.Equal(expected, actual);
     }
 
     [Fact]
@@ -87,7 +118,7 @@ public class OriginalCareApiTests(OriginalCareApiFactory factory) : IClassFixtur
         var horseId = factory.AddHorse("Incident horse");
         using var groom = factory.Groom();
         var response = await groom.PostAsJsonAsync("/api/care/incident-reports", new
-        { HorseID = horseId, GroomID = factory.Ids.VetId, LoaiSuCo = "Bỏ ăn", MoTa = "  Bỏ bữa sáng  ", Ngay = "2026-10-12" });
+        { HorseID = horseId.ToString(), GroomID = factory.Ids.VetId, LoaiSuCo = "Bỏ ăn", MoTa = "  Bỏ bữa sáng  ", Ngay = "2026-10-12" });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var report = await response.Content.ReadFromJsonAsync<JsonElement>();
         var id = report.GetProperty("ReportID").GetInt64();

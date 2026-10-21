@@ -42,41 +42,6 @@ public static class MedicalSchemaUpdater
                 CONSTRAINT [FK_VaccinationSchedule_Horse] FOREIGN KEY ([HorseID]) REFERENCES [Horse]([HorseID]) ON DELETE CASCADE
             );
         END;
-        """,
-        """
-        -- Chỉ bổ sung cấu trúc. Không tạo bệnh án, khóa tập hay lịch tiêm mẫu khi chạy ứng dụng.
-        -- Cho phép NULL để giữ nguyên các bản ghi lịch sử chưa có thông tin mở khóa.
-        IF COL_LENGTH('TrainingLock', 'ReleasedByUserId') IS NULL
-            ALTER TABLE [TrainingLock] ADD [ReleasedByUserId] INT NULL;
-        IF COL_LENGTH('TrainingLock', 'ReleaseReason') IS NULL
-            ALTER TABLE [TrainingLock] ADD [ReleaseReason] NVARCHAR(500) NULL;
-        IF COL_LENGTH('TrainingLock', 'ReexamRecordId') IS NULL
-            ALTER TABLE [TrainingLock] ADD [ReexamRecordId] INT NULL;
-        """,
-        """
-        -- Chú thích có thể xem tại Column Properties / Extended Properties trong SSMS.
-        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.TrainingLock')
-            AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.TrainingLock'), 'ReleasedByUserId', 'ColumnId') AND name = N'MS_Description')
-            EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Bác sĩ mở khóa, lấy từ tài khoản đăng nhập; NULL đối với dữ liệu lịch sử chưa ghi nhận.',
-                @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'TrainingLock', @level2type=N'COLUMN', @level2name=N'ReleasedByUserId';
-        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.TrainingLock')
-            AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.TrainingLock'), 'ReleaseReason', 'ColumnId') AND name = N'MS_Description')
-            EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Lý do mở khóa sau tái khám, tối đa 500 ký tự; bắt buộc cho thao tác mở khóa mới.',
-                @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'TrainingLock', @level2type=N'COLUMN', @level2name=N'ReleaseReason';
-        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.TrainingLock')
-            AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.TrainingLock'), 'ReexamRecordId', 'ColumnId') AND name = N'MS_Description')
-            EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Bệnh án tái khám hoàn tất của đúng ngựa dùng làm căn cứ mở khóa.',
-                @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'TrainingLock', @level2type=N'COLUMN', @level2name=N'ReexamRecordId';
-        """,
-        """
-        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TrainingLock_ReleasedBy')
-            ALTER TABLE [TrainingLock] ADD CONSTRAINT [FK_TrainingLock_ReleasedBy]
-                FOREIGN KEY ([ReleasedByUserId]) REFERENCES [Users]([UserID]);
-        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TrainingLock_ReexamRecord')
-            ALTER TABLE [TrainingLock] ADD CONSTRAINT [FK_TrainingLock_ReexamRecord]
-                FOREIGN KEY ([ReexamRecordId]) REFERENCES [MedicalRecord]([MedicalRecordID]);
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'TrainingLock') AND name = N'IX_TrainingLock_ActiveHorse')
-            CREATE INDEX [IX_TrainingLock_ActiveHorse] ON [TrainingLock] ([HorseID]) WHERE [NgayGo] IS NULL;
         """
     ];
 

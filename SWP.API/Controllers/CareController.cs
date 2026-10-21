@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using SWP.Application.DTOs.Care;
 using SWP.Application.Services.Implement;
+using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
 
 namespace SWP.API.Controllers;
@@ -29,7 +30,7 @@ public sealed class CareExceptionFilter : IExceptionFilter
 [Route("api/care")]
 [Authorize(Roles = RoleNames.Groom)]
 [TypeFilter(typeof(CareExceptionFilter))]
-public sealed class CareController(CareService service) : ControllerBase
+public sealed class CareController(ICareService service) : ControllerBase
 {
     private int GroomId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0
         ? id : throw new CareException(401, "Không xác định được tài khoản đăng nhập.");

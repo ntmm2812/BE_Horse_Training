@@ -7,11 +7,6 @@ public class CareTask
 {
     public int CareTaskId { get; set; }
 
-    // NULL: công việc chăm sóc thông thường từ trước, không thuộc luồng chấn thương.
-    public int? InjuryCaseId { get; set; }
-    public int? AssignedByUserId { get; set; }
-    public int Version { get; set; } = 1;
-
     public int HorseId { get; set; }
 
     public string TaskName { get; set; } = null!;

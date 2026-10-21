@@ -29,11 +29,6 @@ public class DatabaseStartupTests
                 services.AddDbContext<ApplicationDbContext>(options => options
                     .UseSqlServer("Server=unused.invalid;Database=NeverConnect;Integrated Security=True;Connect Timeout=1")
                     .AddInterceptors(guard));
-                services.RemoveAll<DbContextOptions<OriginalCareDbContext>>();
-                services.RemoveAll<IDbContextOptionsConfiguration<OriginalCareDbContext>>();
-                services.AddDbContext<OriginalCareDbContext>(options => options
-                    .UseSqlServer("Server=unused.invalid;Database=NeverConnect;Integrated Security=True;Connect Timeout=1")
-                    .AddInterceptors(guard));
             });
         });
         using var client = app.CreateClient();

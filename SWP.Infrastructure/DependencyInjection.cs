@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ITrainingPlanRepository, TrainingPlanRepository>();
         services.AddScoped<ITrainingSessionRepository, TrainingSessionRepository>();
         services.AddScoped<IMedicalRepository, MedicalRepository>();
+        services.AddScoped<ICareRepository, CareRepository>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 

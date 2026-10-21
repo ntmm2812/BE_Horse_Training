@@ -16,8 +16,6 @@ public class ApplicationDbContext : DbContext
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
 
     public virtual DbSet<CareTask> CareTasks { get; set; }
-    public virtual DbSet<InjuryCase> InjuryCases { get; set; }
-    public virtual DbSet<InjuryCaseEvent> InjuryCaseEvents { get; set; }
 
     public virtual DbSet<FeedingPlan> FeedingPlans { get; set; }
 

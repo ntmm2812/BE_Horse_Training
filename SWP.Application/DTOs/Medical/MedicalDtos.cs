@@ -44,7 +44,6 @@ public class MedicalRecordSaveResultDto
 
 public class TrainingLockDto
 {
-    public int? InjuryCaseId { get; set; }
     [JsonPropertyName("LockID")]
     public int LockID { get; set; }
     [JsonPropertyName("HorseID")]
@@ -57,9 +56,6 @@ public class TrainingLockDto
     public string NgayDat { get; set; } = string.Empty;
     [JsonPropertyName("NgayGo")]
     public string? NgayGo { get; set; }
-    public int? ReleasedByUserId { get; set; }
-    public string? ReleaseReason { get; set; }
-    public int? ReexamRecordId { get; set; }
 }
 
 public class CreateTrainingLockRequestDto

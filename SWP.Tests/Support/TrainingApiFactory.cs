@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -48,13 +49,37 @@ public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
             services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection));
 
-            services.RemoveAll<DbContextOptions<OriginalCareDbContext>>();
-            services.RemoveAll<IDbContextOptionsConfiguration<OriginalCareDbContext>>();
-            services.AddDbContext<OriginalCareDbContext>(options => options.UseSqlite(_connection));
-
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
+            services.AddTransient<IStartupFilter, TestBufferStartupFilter>();
         });
+    }
+
+    private sealed class TestBufferStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
+        {
+            return app =>
+            {
+                app.Use(async (context, nextMiddleware) =>
+                {
+                    var originalBody = context.Response.Body;
+                    using var memStream = new MemoryStream();
+                    context.Response.Body = memStream;
+                    try
+                    {
+                        await nextMiddleware();
+                    }
+                    finally
+                    {
+                        memStream.Position = 0;
+                        await memStream.CopyToAsync(originalBody);
+                        context.Response.Body = originalBody;
+                    }
+                });
+                next(app);
+            };
+        }
     }
 
     public int AddHorse(string name, string? healthStatus = "Đủ điều kiện") =>
@@ -112,9 +137,8 @@ public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
         }
     }
 
-    private ApplicationDbContext ResolveDb(IServiceProvider services) => UseOriginalSchema
-        ? services.GetRequiredService<OriginalCareDbContext>()
-        : services.GetRequiredService<ApplicationDbContext>();
+    private ApplicationDbContext ResolveDb(IServiceProvider services) =>
+        services.GetRequiredService<ApplicationDbContext>();
 }
 
 public sealed class OriginalCareApiFactory : TrainingApiFactory

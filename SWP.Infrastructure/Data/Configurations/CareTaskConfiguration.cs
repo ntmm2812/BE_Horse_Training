@@ -11,10 +11,6 @@ public class CareTaskConfiguration : IEntityTypeConfiguration<CareTask>
         entity.HasKey(e => e.CareTaskId).HasName("PK__CareTask__C24D790B98D9A741");
 
         entity.ToTable("CareTask");
-        entity.Property(e => e.Version).IsConcurrencyToken().HasDefaultValue(1);
-        entity.HasOne<InjuryCase>().WithMany().HasForeignKey(e => e.InjuryCaseId).OnDelete(DeleteBehavior.Restrict);
-        entity.HasOne<User>().WithMany().HasForeignKey(e => e.AssignedByUserId).OnDelete(DeleteBehavior.Restrict);
-        entity.HasIndex(e => new { e.InjuryCaseId, e.Status, e.ScheduledAt });
 
         entity.Property(e => e.CareTaskId).HasColumnName("CareTaskID");
         entity.Property(e => e.CompletedAt).HasColumnType("datetime");

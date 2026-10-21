@@ -19,28 +19,22 @@ public class MedicalRepository : IMedicalRepository
     public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
         _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
-    public Task<bool> IsExamLinkedToCaseAsync(int caseId, int recordId, CancellationToken cancellationToken = default) =>
-        _context.InjuryCaseEvents.AnyAsync(e => e.InjuryCaseId == caseId && e.MedicalRecordId == recordId, cancellationToken);
-
     public async Task TrackCaseLockReleaseAsync(TrainingLock trainingLock, int userId, CancellationToken cancellationToken = default)
     {
-        // Audit every release, including locks outside the injury workflow.
         _context.AuditLogs.Add(new AuditLog
         {
-            Action = "ReleaseTrainingLock", TableName = "TrainingLock", RecordId = trainingLock.LockId,
-            UserId = userId, CreatedAt = DateTime.UtcNow,
+            Action = "ReleaseTrainingLock",
+            TableName = "TrainingLock",
+            RecordId = trainingLock.LockId,
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow,
             NewValue = System.Text.Json.JsonSerializer.Serialize(new
-            { trainingLock.NgayGo, trainingLock.ReleaseReason, trainingLock.ReexamRecordId })
-        });
-        if (_context is OriginalCareDbContext || trainingLock.InjuryCaseId is not int id) return;
-        var injury = await _context.InjuryCases.SingleAsync(c => c.InjuryCaseId == id, cancellationToken);
-        injury.Version++;
-        injury.UpdatedAt = DateTime.UtcNow;
-        _context.InjuryCaseEvents.Add(new InjuryCaseEvent
-        {
-            InjuryCaseId = id, ActorUserId = userId, Kind = "TrainingLockReleased", CreatedAt = injury.UpdatedAt,
-            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
-            { trainingLock.LockId, trainingLock.ReleaseReason, trainingLock.ReexamRecordId })
+            {
+                trainingLock.LockId,
+                trainingLock.HorseId,
+                trainingLock.NgayGo,
+                trainingLock.LyDo
+            })
         });
         await _context.SaveChangesAsync(cancellationToken);
     }

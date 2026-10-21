@@ -259,30 +259,18 @@ public class MedicalService : IMedicalService
             throw new ArgumentException("Vui lòng chọn tình trạng sức khỏe mới hợp lệ");
         }
 
-        // Khóa thuộc hồ sơ chấn thương luôn cần bệnh án tái khám; khóa tạo từ luồng FE thì chỉ kiểm tra khi có gửi.
-        if (request.ReexamRecordId is null && lockEntity.InjuryCaseId is not null)
-            throw new ArgumentException("Khóa thuộc hồ sơ chấn thương cần bệnh án tái khám đã gắn vào hồ sơ.");
-
-        MedicalRecord? reexam = null;
         if (request.ReexamRecordId is int reexamId)
         {
-            reexam = await _medicalRepository.GetRecordByIdAsync(reexamId, cancellationToken);
+            var reexam = await _medicalRepository.GetRecordByIdAsync(reexamId, cancellationToken);
             if (reexam is null || reexam.HorseId != lockEntity.HorseId
                 || DateOnly.FromDateTime(reexam.RecordDate) < lockEntity.NgayDat
                 || reexam.RecordDate.Date > DateTime.Today
                 || reexam.Status != "Completed"
                 || !await _medicalRepository.IsLatestRecordAsync(reexam.HorseId, reexam.RecordDate, reexam.MedicalRecordId, cancellationToken))
                 throw new ArgumentException("Cần bệnh án tái khám hoàn tất mới nhất của đúng ngựa, từ ngày khóa đến hôm nay.");
-
-            if (lockEntity.InjuryCaseId is int caseId &&
-                !await _medicalRepository.IsExamLinkedToCaseAsync(caseId, reexam.MedicalRecordId, cancellationToken))
-                throw new ArgumentException("Bệnh án tái khám phải được gắn vào đúng hồ sơ chấn thương trước khi mở khóa.");
         }
 
         lockEntity.NgayGo = DateOnly.FromDateTime(DateTime.Today);
-        lockEntity.ReleasedByUserId = vetId;
-        lockEntity.ReleaseReason = reason;
-        lockEntity.ReexamRecordId = reexam?.MedicalRecordId;
         await _medicalRepository.TrackCaseLockReleaseAsync(lockEntity, vetId, cancellationToken);
 
         // Lưu trong transaction trước khi truy vấn lại các khóa còn hiệu lực.

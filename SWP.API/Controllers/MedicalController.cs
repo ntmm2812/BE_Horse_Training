@@ -48,7 +48,7 @@ public class MedicalController : ControllerBase
 
     [HttpGet("incident-reports")]
     public Task<List<IncidentReportDto>> IncidentReports(
-        [FromServices] CareService service,
+        [FromServices] ICareService service,
         [FromQuery] int? horseId, CancellationToken ct) => service.GetIncidentsForVet(horseId, ct);
 
     [HttpGet("records/{recordId:int}/is-latest")]
