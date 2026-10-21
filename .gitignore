@@ -21,5 +21,4 @@ SWP.API/appsettings.json
 *.p12
 *.key
 
-# Separate repository already present in this workspace
-/BE_Horse/
+*.doc

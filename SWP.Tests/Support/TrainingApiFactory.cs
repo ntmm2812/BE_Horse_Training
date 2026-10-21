@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Persistence;
 using SWP.Infrastructure.Security.Interface;
@@ -15,8 +17,9 @@ using SWP.Infrastructure.Security.Interface;
 namespace SWP.Tests.Support;
 
 /// <summary> Chạy API thật (Program.cs) trên SQLite in-memory với đồng hồ cố định. </summary>
-public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
+public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
 {
+    protected virtual bool UseOriginalSchema => false;
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:;Foreign Keys=True");
@@ -38,6 +41,8 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
     {
         _connection.Open();
         builder.UseEnvironment("Development");
+        // Test không phụ thuộc quyền ghi Windows Event Log của máy chạy.
+        builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
@@ -46,7 +51,35 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
 
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
+            services.AddTransient<IStartupFilter, TestBufferStartupFilter>();
         });
+    }
+
+    private sealed class TestBufferStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
+        {
+            return app =>
+            {
+                app.Use(async (context, nextMiddleware) =>
+                {
+                    var originalBody = context.Response.Body;
+                    using var memStream = new MemoryStream();
+                    context.Response.Body = memStream;
+                    try
+                    {
+                        await nextMiddleware();
+                    }
+                    finally
+                    {
+                        memStream.Position = 0;
+                        await memStream.CopyToAsync(originalBody);
+                        context.Response.Body = originalBody;
+                    }
+                });
+                next(app);
+            };
+        }
     }
 
     public int AddHorse(string name, string? healthStatus = "Đủ điều kiện") =>
@@ -55,7 +88,7 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
     public T WithDb<T>(Func<ApplicationDbContext, T> action)
     {
         using var scope = Services.CreateScope();
-        return action(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+        return action(ResolveDb(scope.ServiceProvider));
     }
 
     public HttpClient Anonymous() => CreateClient();
@@ -98,9 +131,17 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
             }
 
             using var scope = Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var db = ResolveDb(scope.ServiceProvider);
             db.Database.EnsureCreated();
             _ids = TestData.SeedBasics(db);
         }
     }
+
+    private ApplicationDbContext ResolveDb(IServiceProvider services) =>
+        services.GetRequiredService<ApplicationDbContext>();
+}
+
+public sealed class OriginalCareApiFactory : TrainingApiFactory
+{
+    protected override bool UseOriginalSchema => true;
 }
