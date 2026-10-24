@@ -8,7 +8,6 @@ public interface IMedicalRepository
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task<TrainingLock?> GetActiveLockForHorseAsync(int horseId, CancellationToken cancellationToken = default);
     Task TrackCaseLockReleaseAsync(TrainingLock trainingLock, int userId, string reason, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<AuditLog>> GetIncidentAuditLogsAsync(int? horseId = null, CancellationToken cancellationToken = default);
 
     // Medical Record
     Task<IReadOnlyList<MedicalRecord>> GetRecordsAsync(int? horseId, CancellationToken cancellationToken = default);

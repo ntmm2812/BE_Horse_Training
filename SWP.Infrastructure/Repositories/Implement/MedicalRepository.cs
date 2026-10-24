@@ -39,23 +39,6 @@ public class MedicalRepository : IMedicalRepository
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AuditLog>> GetIncidentAuditLogsAsync(int? horseId = null, CancellationToken cancellationToken = default)
-    {
-        var query = _context.AuditLogs
-            .AsNoTracking()
-            .Where(a => a.Action == "ReportIncident" && a.TableName == "Horse" && a.UserId != null);
-
-        if (horseId.HasValue)
-        {
-            query = query.Where(a => a.RecordId == horseId.Value);
-        }
-
-        return await query
-            .OrderByDescending(a => a.CreatedAt)
-            .ThenByDescending(a => a.LogId)
-            .ToListAsync(cancellationToken);
-    }
-
     public Task<TrainingLock?> GetActiveLockForHorseAsync(int horseId, CancellationToken cancellationToken = default) =>
         _context.TrainingLocks.AsNoTracking()
             .Where(l => l.HorseId == horseId && l.NgayGo == null)

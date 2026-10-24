@@ -45,9 +45,6 @@ public class MedicalController : ControllerBase
 
     // ==================== BỆNH ÁN (MEDICALRECORD) ====================
 
-    [HttpGet("incident-reports")]
-    public Task<List<IncidentReportDto>> IncidentReports([FromQuery] int? horseId, CancellationToken ct) =>
-        _medicalService.GetIncidentsForVetAsync(horseId, ct);
 
     [HttpGet("records/{recordId:int}/is-latest")]
     public Task<bool> IsLatest(int recordId, CancellationToken ct) => _medicalService.IsLatestMedicalRecordAsync(recordId, ct);

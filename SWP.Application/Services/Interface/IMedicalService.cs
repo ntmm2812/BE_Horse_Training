@@ -30,6 +30,4 @@ public interface IMedicalService
     // Vets
     Task<List<VetUserDto>> GetVetsAsync(CancellationToken cancellationToken = default);
 
-    // Incidents
-    Task<List<IncidentReportDto>> GetIncidentsForVetAsync(int? horseId, CancellationToken cancellationToken = default);
 }

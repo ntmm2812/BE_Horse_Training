@@ -133,12 +133,3 @@ public class UpdateHealthStatusRequestDto
     public string TrangThai { get; set; } = string.Empty;
     public string Ngay { get; set; } = string.Empty;
 }
-
-public sealed record IncidentReportDto(
-    [property: JsonPropertyName("ReportID")] long ReportID,
-    [property: JsonPropertyName("HorseID")] int HorseID,
-    [property: JsonPropertyName("GroomID")] int GroomID,
-    [property: JsonPropertyName("LoaiSuCo")] string LoaiSuCo,
-    [property: JsonPropertyName("MoTa")] string MoTa,
-    [property: JsonPropertyName("HinhAnh")] string HinhAnh,
-    [property: JsonPropertyName("Ngay")] string Ngay);

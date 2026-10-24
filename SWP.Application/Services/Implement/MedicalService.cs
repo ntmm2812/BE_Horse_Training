@@ -446,37 +446,6 @@ public class MedicalService : IMedicalService
         return vets.Select(MedicalMapper.ToVetDto).ToList();
     }
 
-    public async Task<List<IncidentReportDto>> GetIncidentsForVetAsync(int? horseId, CancellationToken cancellationToken = default)
-    {
-        var logs = await _medicalRepository.GetIncidentAuditLogsAsync(horseId, cancellationToken);
-        var list = new List<IncidentReportDto>();
-        foreach (var a in logs)
-        {
-            var data = System.Text.Json.JsonSerializer.Deserialize<CreateIncidentReportPayload>(a.NewValue ?? "{}");
-            if (data is not null && a.UserId.HasValue)
-            {
-                list.Add(new IncidentReportDto(
-                    a.LogId,
-                    a.RecordId ?? data.HorseID,
-                    a.UserId.Value,
-                    data.LoaiSuCo ?? "",
-                    data.MoTa ?? "",
-                    data.HinhAnh ?? "",
-                    data.Ngay ?? ""));
-            }
-        }
-        return list.OrderByDescending(r => r.Ngay).ThenByDescending(r => r.ReportID).ToList();
-    }
-
-    private sealed class CreateIncidentReportPayload
-    {
-        public int HorseID { get; set; }
-        public string? LoaiSuCo { get; set; }
-        public string? MoTa { get; set; }
-        public string? HinhAnh { get; set; }
-        public string? Ngay { get; set; }
-    }
-
     private async Task<bool> UpdateHorseHealthInternalAsync(
         int horseId,
         string trangThai,
