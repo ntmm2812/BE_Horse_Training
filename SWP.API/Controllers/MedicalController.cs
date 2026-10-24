@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SWP.Application.DTOs.Medical;
 using SWP.Application.Services.Interface;
+using SWP.Domain.Common;
 
 namespace SWP.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = RoleNames.Veterinarian)]
 public class MedicalController : ControllerBase
 {
     private readonly IMedicalService _medicalService;
@@ -21,7 +23,6 @@ public class MedicalController : ControllerBase
     // ==================== BỆNH ÁN (MEDICALRECORD) ====================
 
     [HttpGet("records")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetRecords([FromQuery] int? horseId, CancellationToken cancellationToken)
     {
         var records = await _medicalService.GetMedicalRecordsAsync(horseId, cancellationToken);
@@ -29,7 +30,6 @@ public class MedicalController : ControllerBase
     }
 
     [HttpGet("records/{recordId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetRecordById(int recordId, CancellationToken cancellationToken)
     {
         var record = await _medicalService.GetMedicalRecordByIdAsync(recordId, cancellationToken);
@@ -41,7 +41,6 @@ public class MedicalController : ControllerBase
     }
 
     [HttpGet("records/latest-exam/{horseId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetLatestExamDate(int horseId, CancellationToken cancellationToken)
     {
         var result = await _medicalService.GetLatestExamDateAsync(horseId, cancellationToken);
@@ -49,12 +48,12 @@ public class MedicalController : ControllerBase
     }
 
     [HttpPost("records")]
-    [AllowAnonymous]
     public async Task<IActionResult> CreateRecord([FromBody] SaveMedicalRecordRequestDto request, CancellationToken cancellationToken)
     {
         try
         {
-            var vetId = GetCurrentUserIdOrDefault();
+            var vetId = GetCurrentUserId();
+            if (vetId <= 0) return Unauthorized();
             var result = await _medicalService.CreateMedicalRecordAsync(request, vetId, cancellationToken);
             return StatusCode(StatusCodes.Status201Created, result);
         }
@@ -62,19 +61,15 @@ public class MedicalController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpPut("records/{recordId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> UpdateRecord(int recordId, [FromBody] SaveMedicalRecordRequestDto request, CancellationToken cancellationToken)
     {
         try
         {
-            var vetId = GetCurrentUserIdOrDefault();
+            var vetId = GetCurrentUserId();
+            if (vetId <= 0) return Unauthorized();
             var result = await _medicalService.UpdateMedicalRecordAsync(recordId, request, vetId, cancellationToken);
             return Ok(result);
         }
@@ -90,16 +85,11 @@ public class MedicalController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     // ==================== LỆNH KHÓA HUẤN LUYỆN (TRAININGLOCK) ====================
 
     [HttpGet("training-locks")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetTrainingLocks(CancellationToken cancellationToken)
     {
         var locks = await _medicalService.GetTrainingLocksAsync(cancellationToken);
@@ -107,7 +97,6 @@ public class MedicalController : ControllerBase
     }
 
     [HttpGet("training-locks/active")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetActiveTrainingLocks(CancellationToken cancellationToken)
     {
         var locks = await _medicalService.GetActiveTrainingLocksAsync(cancellationToken);
@@ -115,12 +104,12 @@ public class MedicalController : ControllerBase
     }
 
     [HttpPost("training-locks")]
-    [AllowAnonymous]
     public async Task<IActionResult> CreateTrainingLock([FromBody] CreateTrainingLockRequestDto request, CancellationToken cancellationToken)
     {
         try
         {
-            var vetId = GetCurrentUserIdOrDefault();
+            var vetId = GetCurrentUserId();
+            if (vetId <= 0) return Unauthorized();
             var result = await _medicalService.CreateTrainingLockAsync(request, vetId, cancellationToken);
             return StatusCode(StatusCodes.Status201Created, result);
         }
@@ -132,19 +121,16 @@ public class MedicalController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpPost("training-locks/{lockId:int}/release")]
-    [AllowAnonymous]
     public async Task<IActionResult> ReleaseTrainingLock(int lockId, [FromBody] ReleaseTrainingLockRequestDto request, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _medicalService.ReleaseTrainingLockAsync(lockId, request.NewStatus, cancellationToken);
+            var vetId = GetCurrentUserId();
+            if (vetId <= 0) return Unauthorized();
+            var result = await _medicalService.ReleaseTrainingLockAsync(lockId, request, vetId, cancellationToken);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -159,16 +145,11 @@ public class MedicalController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     // ==================== LỊCH TIÊM PHÒNG / TẨY GIUN (VACCINATIONSCHEDULE) ====================
 
     [HttpGet("vaccinations")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetVaccinations([FromQuery] int? horseId, CancellationToken cancellationToken)
     {
         var list = await _medicalService.GetVaccinationsAsync(horseId, cancellationToken);
@@ -176,7 +157,6 @@ public class MedicalController : ControllerBase
     }
 
     [HttpGet("vaccinations/{scheduleId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetVaccinationById(int scheduleId, CancellationToken cancellationToken)
     {
         var item = await _medicalService.GetVaccinationByIdAsync(scheduleId, cancellationToken);
@@ -188,7 +168,6 @@ public class MedicalController : ControllerBase
     }
 
     [HttpPost("vaccinations")]
-    [AllowAnonymous]
     public async Task<IActionResult> CreateVaccination([FromBody] SaveVaccinationRequestDto request, CancellationToken cancellationToken)
     {
         try
@@ -204,14 +183,9 @@ public class MedicalController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpPut("vaccinations/{scheduleId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> UpdateVaccination(int scheduleId, [FromBody] SaveVaccinationRequestDto request, CancellationToken cancellationToken)
     {
         try
@@ -231,14 +205,9 @@ public class MedicalController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpDelete("vaccinations/{scheduleId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> DeleteVaccination(int scheduleId, CancellationToken cancellationToken)
     {
         try
@@ -254,14 +223,9 @@ public class MedicalController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpPost("vaccinations/{scheduleId:int}/mark-done")]
-    [AllowAnonymous]
     public async Task<IActionResult> MarkVaccinated(int scheduleId, [FromBody] MarkVaccinatedRequestDto request, CancellationToken cancellationToken)
     {
         try
@@ -281,23 +245,18 @@ public class MedicalController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     // ==================== BÁC SĨ THÚ Y (VETS) ====================
 
     [HttpGet("vets")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetVets(CancellationToken cancellationToken)
     {
         var vets = await _medicalService.GetVetsAsync(cancellationToken);
         return Ok(vets);
     }
 
-    private int GetCurrentUserIdOrDefault()
+    private int GetCurrentUserId()
     {
         var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
             ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -307,7 +266,6 @@ public class MedicalController : ControllerBase
             return userId;
         }
 
-        // Fallback mặc định cho Vet ID trong DB nếu chưa đăng nhập hoặc chạy local mock
-        return 2;
+        return 0;
     }
 }

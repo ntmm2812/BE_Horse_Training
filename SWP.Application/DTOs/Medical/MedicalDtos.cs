@@ -4,7 +4,7 @@ public class MedicalRecordDto
 {
     public int RecordID { get; set; }
     public int HorseID { get; set; }
-    public int VetID { get; set; }
+    public int? VetID { get; set; }
     public string Ngay { get; set; } = string.Empty;
     public string ChanDoan { get; set; } = string.Empty;
     public string PhacDo { get; set; } = string.Empty;
@@ -30,12 +30,16 @@ public class MedicalRecordSaveResultDto
 
 public class TrainingLockDto
 {
+    public int? InjuryCaseId { get; set; }
     public int LockID { get; set; }
     public int HorseID { get; set; }
     public int VetID { get; set; }
     public string LyDo { get; set; } = string.Empty;
     public string NgayDat { get; set; } = string.Empty;
     public string? NgayGo { get; set; }
+    public int? ReleasedByUserId { get; set; }
+    public string? ReleaseReason { get; set; }
+    public int? ReexamRecordId { get; set; }
 }
 
 public class CreateTrainingLockRequestDto
@@ -48,6 +52,8 @@ public class CreateTrainingLockRequestDto
 public class ReleaseTrainingLockRequestDto
 {
     public string NewStatus { get; set; } = string.Empty;
+    public string ReleaseReason { get; set; } = string.Empty;
+    public int ReexamRecordId { get; set; }
 }
 
 public class VaccinationScheduleDto

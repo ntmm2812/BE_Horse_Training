@@ -37,4 +37,7 @@
     <ProjectReference Include="..\SWP.Domain\SWP.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Data\Sql\InjuryWorkflow.sql" />
+  </ItemGroup>
 </Project>

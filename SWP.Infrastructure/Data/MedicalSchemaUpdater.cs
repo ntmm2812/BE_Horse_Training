@@ -44,66 +44,49 @@ public static class MedicalSchemaUpdater
         END;
         """,
         """
-        IF NOT EXISTS (SELECT 1 FROM [TrainingLock])
-        BEGIN
-            IF EXISTS (SELECT 1 FROM [Horse] WHERE [HorseID] = 4)
-            BEGIN
-                INSERT INTO [TrainingLock] ([HorseID], [VetID], [LyDo], [NgayDat], [NgayGo])
-                VALUES (4, 2, N'Viêm gân nhẹ chân trước', DATEADD(day, -20, CAST(GETDATE() AS DATE)), DATEADD(day, -12, CAST(GETDATE() AS DATE)));
-            END;
-
-            IF EXISTS (SELECT 1 FROM [Horse] WHERE [HorseID] = 3)
-            BEGIN
-                INSERT INTO [TrainingLock] ([HorseID], [VetID], [LyDo], [NgayDat], [NgayGo])
-                VALUES (3, 2, N'Viêm gân gấp chân trước trái', DATEADD(day, -12, CAST(GETDATE() AS DATE)), NULL);
-
-                UPDATE [HorseHealthStatus]
-                SET [TrangThai] = N'Đang điều trị', [NgayCapNhat] = GETDATE()
-                WHERE [HorseID] = 3;
-            END;
-        END;
+        -- Chỉ bổ sung cấu trúc. Không tạo bệnh án, khóa tập hay lịch tiêm mẫu khi chạy ứng dụng.
+        -- Cho phép NULL để giữ nguyên các bản ghi lịch sử chưa có thông tin mở khóa.
+        IF COL_LENGTH('TrainingLock', 'ReleasedByUserId') IS NULL
+            ALTER TABLE [TrainingLock] ADD [ReleasedByUserId] INT NULL;
+        IF COL_LENGTH('TrainingLock', 'ReleaseReason') IS NULL
+            ALTER TABLE [TrainingLock] ADD [ReleaseReason] NVARCHAR(500) NULL;
+        IF COL_LENGTH('TrainingLock', 'ReexamRecordId') IS NULL
+            ALTER TABLE [TrainingLock] ADD [ReexamRecordId] INT NULL;
         """,
         """
-        UPDATE [MedicalRecord]
-        SET [ViTriChanThuong] = N'Không có chấn thương'
-        WHERE [ViTriChanThuong] IS NULL;
+        -- Chú thích có thể xem tại Column Properties / Extended Properties trong SSMS.
+        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.TrainingLock')
+            AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.TrainingLock'), 'ReleasedByUserId', 'ColumnId') AND name = N'MS_Description')
+            EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Bác sĩ mở khóa, lấy từ tài khoản đăng nhập; NULL đối với dữ liệu lịch sử chưa ghi nhận.',
+                @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'TrainingLock', @level2type=N'COLUMN', @level2name=N'ReleasedByUserId';
+        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.TrainingLock')
+            AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.TrainingLock'), 'ReleaseReason', 'ColumnId') AND name = N'MS_Description')
+            EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Lý do mở khóa sau tái khám, tối đa 500 ký tự; bắt buộc cho thao tác mở khóa mới.',
+                @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'TrainingLock', @level2type=N'COLUMN', @level2name=N'ReleaseReason';
+        IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.TrainingLock')
+            AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.TrainingLock'), 'ReexamRecordId', 'ColumnId') AND name = N'MS_Description')
+            EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Bệnh án tái khám hoàn tất của đúng ngựa dùng làm căn cứ mở khóa.',
+                @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'TrainingLock', @level2type=N'COLUMN', @level2name=N'ReexamRecordId';
         """,
         """
-        IF NOT EXISTS (SELECT 1 FROM [VaccinationSchedule])
-        BEGIN
-            INSERT INTO [VaccinationSchedule] ([HorseID], [Loai], [NgayHen], [TrangThai]) VALUES
-            (1, N'Cúm ngựa', DATEADD(day, -40, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (1, N'Uốn ván', DATEADD(day, 4, CAST(GETDATE() AS DATE)), N'Chờ tiêm'),
-            (2, N'Uốn ván', DATEADD(day, -60, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (2, N'Cúm ngựa', DATEADD(day, -15, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (2, N'Viêm não Nhật Bản', DATEADD(day, -75, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (3, N'Cúm ngựa', DATEADD(day, -90, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (3, N'Uốn ván', DATEADD(day, -130, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (4, N'Uốn ván', DATEADD(day, -30, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (4, N'Cúm ngựa', DATEADD(day, -10, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (4, N'Viêm não Nhật Bản', DATEADD(day, 6, CAST(GETDATE() AS DATE)), N'Chờ tiêm'),
-            (5, N'Cúm ngựa', DATEADD(day, -50, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (5, N'Uốn ván', DATEADD(day, -95, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (6, N'Uốn ván', DATEADD(day, -100, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (6, N'Cúm ngựa', DATEADD(day, -3, CAST(GETDATE() AS DATE)), N'Chờ tiêm'),
-            (6, N'Viêm não Nhật Bản', DATEADD(day, -160, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (2, N'Tẩy giun', DATEADD(day, 45, CAST(GETDATE() AS DATE)), N'Chờ tiêm'),
-            (1, N'Dại', DATEADD(day, -70, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (2, N'Dại', DATEADD(day, -85, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (4, N'Dại', DATEADD(day, -120, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (6, N'Dại', DATEADD(day, -65, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (3, N'Tẩy giun', DATEADD(day, -25, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (5, N'Tẩy giun', DATEADD(day, -18, CAST(GETDATE() AS DATE)), N'Đã tiêm'),
-            (5, N'Viêm não Nhật Bản', DATEADD(day, -5, CAST(GETDATE() AS DATE)), N'Chờ tiêm');
-        END;
+        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TrainingLock_ReleasedBy')
+            ALTER TABLE [TrainingLock] ADD CONSTRAINT [FK_TrainingLock_ReleasedBy]
+                FOREIGN KEY ([ReleasedByUserId]) REFERENCES [Users]([UserID]);
+        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_TrainingLock_ReexamRecord')
+            ALTER TABLE [TrainingLock] ADD CONSTRAINT [FK_TrainingLock_ReexamRecord]
+                FOREIGN KEY ([ReexamRecordId]) REFERENCES [MedicalRecord]([MedicalRecordID]);
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'TrainingLock') AND name = N'IX_TrainingLock_ActiveHorse')
+            CREATE INDEX [IX_TrainingLock_ActiveHorse] ON [TrainingLock] ([HorseID]) WHERE [NgayGo] IS NULL;
         """
     ];
 
     public static void Apply(ApplicationDbContext db)
     {
+        using var transaction = db.Database.BeginTransaction();
         foreach (var statement in Statements)
         {
             db.Database.ExecuteSqlRaw(statement);
         }
+        transaction.Commit();
     }
 }

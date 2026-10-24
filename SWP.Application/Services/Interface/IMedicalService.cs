@@ -15,7 +15,7 @@ public interface IMedicalService
     Task<List<TrainingLockDto>> GetTrainingLocksAsync(CancellationToken cancellationToken = default);
     Task<List<TrainingLockDto>> GetActiveTrainingLocksAsync(CancellationToken cancellationToken = default);
     Task<TrainingLockDto> CreateTrainingLockAsync(CreateTrainingLockRequestDto request, int vetId, CancellationToken cancellationToken = default);
-    Task<TrainingLockDto> ReleaseTrainingLockAsync(int lockId, string newStatus, CancellationToken cancellationToken = default);
+    Task<TrainingLockDto> ReleaseTrainingLockAsync(int lockId, ReleaseTrainingLockRequestDto request, int vetId, CancellationToken cancellationToken = default);
 
     // Vaccinations
     Task<List<VaccinationScheduleDto>> GetVaccinationsAsync(int? horseId, CancellationToken cancellationToken = default);
