@@ -23,16 +23,12 @@ public static class MedicalMapper
     {
         return new TrainingLockDto
         {
-            InjuryCaseId = l.InjuryCaseId,
             LockID = l.LockId,
             HorseID = l.HorseId,
             VetID = l.VetId,
             LyDo = l.LyDo,
             NgayDat = l.NgayDat.ToString("yyyy-MM-dd"),
-            NgayGo = l.NgayGo?.ToString("yyyy-MM-dd"),
-            ReleasedByUserId = l.ReleasedByUserId,
-            ReleaseReason = l.ReleaseReason,
-            ReexamRecordId = l.ReexamRecordId
+            NgayGo = l.NgayGo?.ToString("yyyy-MM-dd")
         };
     }
 

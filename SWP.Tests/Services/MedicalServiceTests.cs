@@ -102,7 +102,7 @@ public class MedicalServiceTests : IDisposable
         Assert.Equal(horseId, lockDto.HorseID);
         Assert.Null(lockDto.NgayGo);
 
-        // Check health status changed to "Đang điều trị"
+        // Check health status changed to "Chấn thương"
         var health = _t.Db(db => db.HorseHealthStatuses.First(h => h.HorseId == horseId));
         Assert.Equal("Chấn thương", health.TrangThai);
     }
@@ -128,6 +128,7 @@ public class MedicalServiceTests : IDisposable
             PhacDo = "Theo dõi vận động sau khi mở khóa",
             Injuries = ["Không có chấn thương"]
         }, _t.Ids.VetId);
+
         var released = await svc.ReleaseTrainingLockAsync(lockDto.LockID, new ReleaseTrainingLockRequestDto
         {
             NewStatus = "Tốt",
@@ -140,9 +141,9 @@ public class MedicalServiceTests : IDisposable
 
         var health = _t.Db(db => db.HorseHealthStatuses.First(h => h.HorseId == horseId));
         Assert.Equal("Đủ điều kiện", health.TrangThai);
-        Assert.Equal(_t.Ids.VetId, released.ReleasedByUserId);
-        Assert.Equal(exam.Record.RecordID, released.ReexamRecordId);
-        Assert.Equal("Đã tái khám và đủ điều kiện tập", released.ReleaseReason);
+
+        var audit = _t.Db(db => db.AuditLogs.First(a => a.Action == "ReleaseTrainingLock" && a.RecordId == lockDto.LockID));
+        Assert.Equal(_t.Ids.VetId, audit.UserId);
         Assert.False((await _t.FitnessService().GetAssessmentAsync(horseId))!.IsTrainingLocked);
     }
 

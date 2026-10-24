@@ -10,7 +10,6 @@ public class TrainingLockConfiguration : IEntityTypeConfiguration<TrainingLock>
     {
         entity.HasKey(e => e.LockId);
         entity.ToTable("TrainingLock");
-        entity.HasOne<InjuryCase>().WithMany().HasForeignKey(e => e.InjuryCaseId).OnDelete(DeleteBehavior.Restrict);
 
         entity.Property(e => e.LockId).HasColumnName("LockID");
         entity.Property(e => e.HorseId).HasColumnName("HorseID");
@@ -18,13 +17,6 @@ public class TrainingLockConfiguration : IEntityTypeConfiguration<TrainingLock>
         entity.Property(e => e.LyDo).HasMaxLength(200).IsRequired();
         entity.Property(e => e.NgayDat).HasColumnType("date");
         entity.Property(e => e.NgayGo).HasColumnType("date");
-        entity.Property(e => e.ReleaseReason).HasMaxLength(500);
-        entity.HasOne<User>().WithMany().HasForeignKey(e => e.ReleasedByUserId)
-            .HasConstraintName("FK_TrainingLock_ReleasedBy")
-            .OnDelete(DeleteBehavior.Restrict);
-        entity.HasOne<MedicalRecord>().WithMany().HasForeignKey(e => e.ReexamRecordId)
-            .HasConstraintName("FK_TrainingLock_ReexamRecord")
-            .OnDelete(DeleteBehavior.Restrict);
 
         entity.HasOne(d => d.Horse)
             .WithMany(p => p.TrainingLocks)

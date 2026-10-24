@@ -11,11 +11,11 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    protected ApplicationDbContext(DbContextOptions options) : base(options) { }
+
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
 
     public virtual DbSet<CareTask> CareTasks { get; set; }
-    public virtual DbSet<InjuryCase> InjuryCases { get; set; }
-    public virtual DbSet<InjuryCaseEvent> InjuryCaseEvents { get; set; }
 
     public virtual DbSet<FeedingPlan> FeedingPlans { get; set; }
 

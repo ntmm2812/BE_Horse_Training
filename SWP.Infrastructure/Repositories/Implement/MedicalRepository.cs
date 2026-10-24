@@ -19,22 +19,41 @@ public class MedicalRepository : IMedicalRepository
     public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
         _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
-    public Task<bool> IsExamLinkedToCaseAsync(int caseId, int recordId, CancellationToken cancellationToken = default) =>
-        _context.InjuryCaseEvents.AnyAsync(e => e.InjuryCaseId == caseId && e.MedicalRecordId == recordId, cancellationToken);
-
-    public async Task TrackCaseLockReleaseAsync(TrainingLock trainingLock, int userId, CancellationToken cancellationToken = default)
+    public async Task TrackCaseLockReleaseAsync(TrainingLock trainingLock, int userId, string reason, CancellationToken cancellationToken = default)
     {
-        if (trainingLock.InjuryCaseId is not int id) return;
-        var injury = await _context.InjuryCases.SingleAsync(c => c.InjuryCaseId == id, cancellationToken);
-        injury.Version++;
-        injury.UpdatedAt = DateTime.UtcNow;
-        _context.InjuryCaseEvents.Add(new InjuryCaseEvent
+        _context.AuditLogs.Add(new AuditLog
         {
-            InjuryCaseId = id, ActorUserId = userId, Kind = "TrainingLockReleased", CreatedAt = injury.UpdatedAt,
-            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
-            { trainingLock.LockId, trainingLock.ReleaseReason, trainingLock.ReexamRecordId })
+            Action = "ReleaseTrainingLock",
+            TableName = "TrainingLock",
+            RecordId = trainingLock.LockId,
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow,
+            NewValue = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                trainingLock.LockId,
+                trainingLock.HorseId,
+                trainingLock.NgayGo,
+                Reason = reason
+            })
         });
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AuditLog>> GetIncidentAuditLogsAsync(int? horseId = null, CancellationToken cancellationToken = default)
+    {
+        var query = _context.AuditLogs
+            .AsNoTracking()
+            .Where(a => a.Action == "ReportIncident" && a.TableName == "Horse" && a.UserId != null);
+
+        if (horseId.HasValue)
+        {
+            query = query.Where(a => a.RecordId == horseId.Value);
+        }
+
+        return await query
+            .OrderByDescending(a => a.CreatedAt)
+            .ThenByDescending(a => a.LogId)
+            .ToListAsync(cancellationToken);
     }
 
     public Task<TrainingLock?> GetActiveLockForHorseAsync(int horseId, CancellationToken cancellationToken = default) =>

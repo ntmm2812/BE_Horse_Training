@@ -8,6 +8,8 @@ public interface IMedicalService
     Task<List<MedicalRecordDto>> GetMedicalRecordsAsync(int? horseId, CancellationToken cancellationToken = default);
     Task<MedicalRecordDto?> GetMedicalRecordByIdAsync(int recordId, CancellationToken cancellationToken = default);
     Task<LatestExamDateDto?> GetLatestExamDateAsync(int horseId, CancellationToken cancellationToken = default);
+    Task<bool> IsLatestMedicalRecordAsync(int recordId, CancellationToken cancellationToken = default);
+    Task<bool> UpdateHealthStatusAsync(int horseId, UpdateHealthStatusRequestDto request, CancellationToken cancellationToken = default);
     Task<MedicalRecordSaveResultDto> CreateMedicalRecordAsync(SaveMedicalRecordRequestDto request, int vetId, CancellationToken cancellationToken = default);
     Task<MedicalRecordSaveResultDto> UpdateMedicalRecordAsync(int recordId, SaveMedicalRecordRequestDto request, int vetId, CancellationToken cancellationToken = default);
 
@@ -27,4 +29,7 @@ public interface IMedicalService
 
     // Vets
     Task<List<VetUserDto>> GetVetsAsync(CancellationToken cancellationToken = default);
+
+    // Incidents
+    Task<List<IncidentReportDto>> GetIncidentsForVetAsync(int? horseId, CancellationToken cancellationToken = default);
 }
