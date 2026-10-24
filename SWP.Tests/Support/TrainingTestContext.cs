@@ -86,6 +86,15 @@ public sealed class TrainingTestContext : IDisposable
             Clock);
     }
 
+    public MedicalService MedicalService()
+    {
+        var db = NewContext();
+        return new MedicalService(
+            new MedicalRepository(db),
+            new HorseRepository(db),
+            new HorseHealthStatusRepository(db));
+    }
+
     /// <summary> Tạo giáo án 3 giai đoạn qua service và áp dụng (Active). </summary>
     public async Task<int> CreateActivePlanAsync(int horseId)
     {
