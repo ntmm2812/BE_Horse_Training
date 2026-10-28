@@ -114,8 +114,6 @@ namespace SWP.API
                 // Script T-SQL chỉ chạy trên SQL Server (test tích hợp dùng SQLite in-memory).
                 if (db.Database.IsSqlServer())
                 {
-                    db.Database.EnsureCreated();
-
                     db.Database.ExecuteSqlRaw("""
                         IF COL_LENGTH('Horse', 'ImageURL') IS NULL
                             ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
@@ -151,7 +149,6 @@ namespace SWP.API
                 app.UseSwaggerUI();
             }
 
-            app.UseDefaultFiles();
             app.UseStaticFiles();
             app.UseHttpsRedirection();
             app.UseCors("Frontend");

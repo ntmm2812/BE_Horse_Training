@@ -86,17 +86,6 @@ public sealed class TrainingTestContext : IDisposable
             Clock);
     }
 
-    public RaceService RaceService()
-    {
-        var db = NewContext();
-        return new RaceService(
-            new RaceRepository(db),
-            new RaceRegistrationRepository(db),
-            new HorseRepository(db),
-            new HorseHealthStatusRepository(db),
-            Clock);
-    }
-
     /// <summary> Tạo giáo án 3 giai đoạn qua service và áp dụng (Active). </summary>
     public async Task<int> CreateActivePlanAsync(int horseId)
     {
