@@ -62,6 +62,16 @@ public sealed class TrainingTestContext : IDisposable
 
     public HorseFitnessService FitnessService() => FitnessService(NewContext());
 
+    public VeterinaryService VetService()
+    {
+        var db = NewContext();
+        return new VeterinaryService(new VeterinaryRepository(db), new UserRepository(db), Clock);
+    }
+
+    public CareService CareService() => new(new CareRepository(NewContext()), Clock);
+
+    public RaceService RaceService() => new(new RaceRepository(NewContext()), Clock);
+
     public TrainingPlanService PlanService()
     {
         var db = NewContext();

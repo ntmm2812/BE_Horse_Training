@@ -104,6 +104,11 @@ public static class OwnerHorseDetailMapper
             return $"Hạng {reg.FinishPosition}";
         }
 
+        if (reg.FinishPosition == 0)
+        {
+            return "Không xếp hạng";
+        }
+
         if (race.RaceDate.HasValue && race.RaceDate.Value > nowUtc)
         {
             return "Sắp diễn ra";

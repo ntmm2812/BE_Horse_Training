@@ -13,9 +13,7 @@ public class SupplyConfiguration : IEntityTypeConfiguration<Supply>
         entity.ToTable("Supply");
 
         entity.Property(e => e.SupplyId).HasColumnName("SupplyID");
-        entity.Property(e => e.Category)
-            .HasMaxLength(50)
-            .IsUnicode(false);
+        entity.Property(e => e.Category).HasMaxLength(50);
         entity.Property(e => e.CreatedAt).HasColumnType("datetime");
         entity.Property(e => e.Description).HasMaxLength(500);
         entity.Property(e => e.QuantityInStock).HasColumnType("decimal(12, 2)");

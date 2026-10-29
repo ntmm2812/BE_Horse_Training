@@ -137,6 +137,9 @@ namespace SWP.API
                         """);
 
                     TrainingSchemaUpdater.Apply(db);
+                    VeterinarySchemaUpdater.Apply(db);
+                    CareSchemaUpdater.Apply(db);
+                    RaceSchemaUpdater.Apply(db);
                 }
             }
 

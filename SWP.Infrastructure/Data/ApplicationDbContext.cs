@@ -25,6 +25,8 @@ public class ApplicationDbContext : DbContext
 
     public virtual DbSet<Horse> Horses { get; set; }
 
+    public virtual DbSet<IncidentReport> IncidentReports { get; set; }
+
     public virtual DbSet<HorseHealthStatus> HorseHealthStatuses { get; set; }
 
     public virtual DbSet<MedicalRecord> MedicalRecords { get; set; }
@@ -49,9 +51,13 @@ public class ApplicationDbContext : DbContext
 
     public virtual DbSet<TrainingPlanPhase> TrainingPlanPhases { get; set; }
 
+    public virtual DbSet<TrainingLock> TrainingLocks { get; set; }
+
     public virtual DbSet<TrainingSchedule> TrainingSchedules { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<VaccinationSchedule> VaccinationSchedules { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

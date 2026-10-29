@@ -35,6 +35,8 @@ public class User
 
     public virtual ICollection<CareTask> CareTasks { get; set; } = new List<CareTask>();
 
+    public virtual ICollection<IncidentReport> IncidentReports { get; set; } = new List<IncidentReport>();
+
     public virtual ICollection<FeedingPlan> FeedingPlans { get; set; } = new List<FeedingPlan>();
 
     public virtual ICollection<FinancialTransaction> FinancialTransactions { get; set; } = new List<FinancialTransaction>();
@@ -52,6 +54,8 @@ public class User
     public virtual Role Role { get; set; } = null!;
 
     public virtual ICollection<Supply> Supplies { get; set; } = new List<Supply>();
+
+    public virtual ICollection<TrainingLock> TrainingLocks { get; set; } = new List<TrainingLock>();
 
     public virtual ICollection<TrainingSchedule> TrainingSchedules { get; set; } = new List<TrainingSchedule>();
 }

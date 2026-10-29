@@ -41,6 +41,8 @@ public class Horse
 
     public virtual ICollection<CareTask> CareTasks { get; set; } = new List<CareTask>();
 
+    public virtual ICollection<IncidentReport> IncidentReports { get; set; } = new List<IncidentReport>();
+
     public virtual ICollection<FeedingPlan> FeedingPlans { get; set; } = new List<FeedingPlan>();
 
     public virtual HorseHealthStatus? HealthStatusRecord { get; set; }
@@ -55,7 +57,11 @@ public class Horse
 
     public virtual ICollection<StableAssignment> StableAssignments { get; set; } = new List<StableAssignment>();
 
+    public virtual ICollection<TrainingLock> TrainingLocks { get; set; } = new List<TrainingLock>();
+
     public virtual ICollection<TrainingPlan> TrainingPlans { get; set; } = new List<TrainingPlan>();
+
+    public virtual ICollection<VaccinationSchedule> VaccinationSchedules { get; set; } = new List<VaccinationSchedule>();
 
     public virtual User User { get; set; } = null!;
 }
