@@ -13,10 +13,12 @@ namespace SWP.API.Controllers;
 public class HorsesController : ControllerBase
 {
     private readonly IHorseService _horseService;
+    private readonly IMedicalService _medicalService;
 
-    public HorsesController(IHorseService horseService)
+    public HorsesController(IHorseService horseService, IMedicalService medicalService)
     {
         _horseService = horseService;
+        _medicalService = medicalService;
     }
 
     [HttpGet("health-statuses")]
@@ -35,6 +37,41 @@ public class HorsesController : ControllerBase
 
         var statuses = await _horseService.GetHealthStatusesAsync(cancellationToken);
         return Ok(statuses);
+    }
+
+    [HttpGet("training-locks")]
+    public async Task<IActionResult> GetTrainingLocks(CancellationToken cancellationToken)
+    {
+        var locks = await _medicalService.GetTrainingLocksAsync(cancellationToken);
+        return Ok(locks);
+    }
+
+    [HttpGet("training-locks/active")]
+    public async Task<IActionResult> GetActiveTrainingLocks(CancellationToken cancellationToken)
+    {
+        var locks = await _medicalService.GetActiveTrainingLocksAsync(cancellationToken);
+        return Ok(locks);
+    }
+
+    [HttpGet("vaccinations")]
+    public async Task<IActionResult> GetVaccinations([FromQuery] int? horseId, CancellationToken cancellationToken)
+    {
+        var list = await _medicalService.GetVaccinationsAsync(horseId, cancellationToken);
+        return Ok(list);
+    }
+
+    [HttpGet("{horseId:int}/latest-exam")]
+    public async Task<IActionResult> GetLatestExamDate(int horseId, CancellationToken cancellationToken)
+    {
+        var result = await _medicalService.GetLatestExamDateAsync(horseId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("vets")]
+    public async Task<IActionResult> GetVets(CancellationToken cancellationToken)
+    {
+        var vets = await _medicalService.GetVetsAsync(cancellationToken);
+        return Ok(vets);
     }
 
     [HttpGet]
