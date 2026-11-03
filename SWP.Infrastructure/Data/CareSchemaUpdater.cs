@@ -21,8 +21,13 @@ public static class CareSchemaUpdater
                 [HinhAnh] NVARCHAR(MAX) NULL,
                 [Ngay] DATE NOT NULL,
                 [CreatedAt] DATETIME NOT NULL,
+                [TrangThai] NVARCHAR(30) NOT NULL CONSTRAINT [DF_IncidentReport_TrangThai] DEFAULT N'Mới',
+                [GhiChuXuLy] NVARCHAR(300) NULL,
+                [HandledBy] INT NULL,
+                [HandledAt] DATETIME NULL,
                 CONSTRAINT [FK_IncidentReport_Horse] FOREIGN KEY ([HorseID]) REFERENCES [Horse]([HorseID]) ON DELETE CASCADE,
-                CONSTRAINT [FK_IncidentReport_Groom] FOREIGN KEY ([GroomID]) REFERENCES [Users]([UserID])
+                CONSTRAINT [FK_IncidentReport_Groom] FOREIGN KEY ([GroomID]) REFERENCES [Users]([UserID]),
+                CONSTRAINT [FK_IncidentReport_Handler] FOREIGN KEY ([HandledBy]) REFERENCES [Users]([UserID])
             );
         END;
         """,
@@ -36,6 +41,31 @@ public static class CareSchemaUpdater
                   AND c.name = N'Category'
                   AND t.name = N'varchar')
             ALTER TABLE [Supply] ALTER COLUMN [Category] NVARCHAR(50) NULL;
+        """,
+        """
+        IF OBJECT_ID(N'IncidentReport', N'U') IS NOT NULL AND COL_LENGTH('IncidentReport', 'TrangThai') IS NULL
+            ALTER TABLE [IncidentReport] ADD [TrangThai] NVARCHAR(30) NOT NULL
+                CONSTRAINT [DF_IncidentReport_TrangThai] DEFAULT N'Mới';
+        """,
+        """
+        IF OBJECT_ID(N'IncidentReport', N'U') IS NOT NULL AND COL_LENGTH('IncidentReport', 'GhiChuXuLy') IS NULL
+            ALTER TABLE [IncidentReport] ADD [GhiChuXuLy] NVARCHAR(300) NULL;
+        """,
+        """
+        IF OBJECT_ID(N'IncidentReport', N'U') IS NOT NULL AND COL_LENGTH('IncidentReport', 'HandledBy') IS NULL
+            ALTER TABLE [IncidentReport] ADD [HandledBy] INT NULL;
+        """,
+        """
+        IF OBJECT_ID(N'IncidentReport', N'U') IS NOT NULL AND COL_LENGTH('IncidentReport', 'HandledAt') IS NULL
+            ALTER TABLE [IncidentReport] ADD [HandledAt] DATETIME NULL;
+        """,
+        """
+        IF OBJECT_ID(N'IncidentReport', N'U') IS NOT NULL
+           AND COL_LENGTH('IncidentReport', 'HandledBy') IS NOT NULL
+           AND NOT EXISTS (
+                SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_IncidentReport_Handler')
+            ALTER TABLE [IncidentReport] ADD CONSTRAINT [FK_IncidentReport_Handler]
+                FOREIGN KEY ([HandledBy]) REFERENCES [Users]([UserID]);
         """,
     ];
 

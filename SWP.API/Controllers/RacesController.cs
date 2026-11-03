@@ -18,10 +18,12 @@ public class RacesController : ControllerBase
         RoleNames.HeadTrainer + "," + RoleNames.Veterinarian + "," + RoleNames.ClubManager + "," + RoleNames.HorseOwner;
 
     private readonly IRaceService _races;
+    private readonly IHorseRealtimeNotifier _realtime;
 
-    public RacesController(IRaceService races)
+    public RacesController(IRaceService races, IHorseRealtimeNotifier realtime)
     {
         _races = races;
+        _realtime = realtime;
     }
 
     [HttpGet]
@@ -57,7 +59,13 @@ public class RacesController : ControllerBase
         }
 
         var result = await _races.RegisterAsync(raceId, request.HorseID, userId, cancellationToken);
-        return result.Success ? Ok(result.Data) : Error(result);
+        if (!result.Success)
+        {
+            return Error(result);
+        }
+
+        await _realtime.NotifyHorseChangedAsync(request.HorseID, HorseRealtimeKinds.ThiDau, cancellationToken);
+        return Ok(result.Data);
     }
 
     [HttpDelete("{raceId:int}/registrations/{horseId:int}")]
@@ -65,7 +73,13 @@ public class RacesController : ControllerBase
     public async Task<IActionResult> Cancel(int raceId, int horseId, CancellationToken cancellationToken)
     {
         var result = await _races.CancelAsync(raceId, horseId, cancellationToken);
-        return result.Success ? NoContent() : Error(result);
+        if (!result.Success)
+        {
+            return Error(result);
+        }
+
+        await _realtime.NotifyHorseChangedAsync(horseId, HorseRealtimeKinds.ThiDau, cancellationToken);
+        return NoContent();
     }
 
     [HttpPut("{raceId:int}/registrations/{horseId:int}/result")]
@@ -77,7 +91,13 @@ public class RacesController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _races.UpdateResultAsync(raceId, horseId, request.ThuHang, cancellationToken);
-        return result.Success ? Ok(result.Data) : Error(result);
+        if (!result.Success)
+        {
+            return Error(result);
+        }
+
+        await _realtime.NotifyHorseChangedAsync(horseId, HorseRealtimeKinds.ThiDau, cancellationToken);
+        return Ok(result.Data);
     }
 
     [HttpPut("{raceId:int}/registrations/{horseId:int}/prize")]
@@ -89,7 +109,13 @@ public class RacesController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _races.SetPrizeAsync(raceId, horseId, request.Amount, cancellationToken);
-        return result.Success ? Ok(result.Data) : Error(result);
+        if (!result.Success)
+        {
+            return Error(result);
+        }
+
+        await _realtime.NotifyHorseChangedAsync(horseId, HorseRealtimeKinds.ThiDau, cancellationToken);
+        return Ok(result.Data);
     }
 
     [HttpGet("prize-alerts")]

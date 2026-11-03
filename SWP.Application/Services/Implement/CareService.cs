@@ -132,6 +132,7 @@ public class CareService : ICareService
                 .First())
             .Select(a => new StableAssignmentDto
             {
+                AssignmentID = a.AssignmentId,
                 StableID = a.StableId,
                 HorseID = a.HorseId,
                 SoChuong = a.Stable.StableName,
@@ -184,7 +185,25 @@ public class CareService : ICareService
     public async Task<IReadOnlyList<IncidentReportDto>> GetIncidentsAsync(int groomId, CancellationToken cancellationToken = default)
     {
         var reports = await _care.ListIncidentsAsync(groomId, cancellationToken);
-        return reports.Select(MapIncident).ToList();
+        return reports.Select(r => MapIncident(r)).ToList();
+    }
+
+    public async Task<IReadOnlyList<IncidentReportDto>> GetHealthIncidentsForVetAsync(CancellationToken cancellationToken = default)
+    {
+        var reports = await _care.ListHealthIncidentsAsync(cancellationToken);
+        var stallByHorse = await StallByHorseAsync(cancellationToken);
+        // Vet chỉ thấy sự cố sức khỏe; báo cáo chuồng trại / thiết bị không trả về
+        return reports
+            .Where(r => IncidentTypes.IsHealth(r.IncidentType) && !IncidentTypes.IsFacility(r.IncidentType))
+            .Select(r => MapIncident(r, stallByHorse))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<IncidentReportDto>> GetAllIncidentsForManagerAsync(CancellationToken cancellationToken = default)
+    {
+        var reports = await _care.ListAllIncidentsAsync(cancellationToken);
+        var stallByHorse = await StallByHorseAsync(cancellationToken);
+        return reports.Select(r => MapIncident(r, stallByHorse)).ToList();
     }
 
     public async Task<ServiceResult<IncidentReportDto>> CreateIncidentAsync(
@@ -235,10 +254,102 @@ public class CareService : ICareService
             ImageUrl = imageUrl,
             ReportedOn = request.Ngay,
             CreatedAt = _clock.GetUtcNow().UtcDateTime,
+            Status = IncidentStatuses.New,
         };
         _care.AddIncident(report);
         await _care.SaveAsync(cancellationToken);
         return ServiceResult<IncidentReportDto>.Ok(MapIncident(report));
+    }
+
+    public async Task<ServiceResult<IncidentReportDto>> UpdateHealthIncidentStatusAsync(
+        int reportId,
+        UpdateIncidentStatusRequestDto request,
+        int vetId,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await _care.GetIncidentTrackedAsync(reportId, cancellationToken);
+        if (report is null)
+        {
+            return ServiceResult<IncidentReportDto>.Fail(ServiceErrorCodes.NotFound, "Không tìm thấy báo cáo sự cố.");
+        }
+
+        if (!IncidentTypes.IsHealth(report.IncidentType))
+        {
+            return ServiceResult<IncidentReportDto>.Fail(ServiceErrorCodes.Validation, "Chỉ xử lý sự cố về sức khỏe ngựa.");
+        }
+
+        var current = IncidentStatuses.NormalizeOrDefault(report.Status);
+        var wanted = (request.TrangThai ?? string.Empty).Trim();
+        if (!IncidentStatuses.TryGetNext(current, out var next) || next != wanted)
+        {
+            return ServiceResult<IncidentReportDto>.Fail(ServiceErrorCodes.InvalidStatus, "Không thể chuyển sang trạng thái này.");
+        }
+
+        var note = string.IsNullOrWhiteSpace(request.GhiChuXuLy) ? string.Empty : request.GhiChuXuLy.Trim();
+        if (note.Length > IncidentTypes.DescriptionMaxLength)
+        {
+            return ServiceResult<IncidentReportDto>.Fail(
+                ServiceErrorCodes.Validation,
+                $"Ghi chú tối đa {IncidentTypes.DescriptionMaxLength} ký tự.");
+        }
+
+        report.Status = next;
+        report.HandlingNote = note;
+        report.HandledBy = vetId;
+        report.HandledAt = _clock.GetUtcNow().UtcDateTime;
+        await _care.SaveAsync(cancellationToken);
+
+        // Load lại kèm navigation để trả tên ngựa / người xử lý
+        var saved = await _care.GetIncidentTrackedAsync(reportId, cancellationToken) ?? report;
+        var stallByHorse = await StallByHorseAsync(cancellationToken);
+        return ServiceResult<IncidentReportDto>.Ok(MapIncident(saved, stallByHorse));
+    }
+
+    public async Task<ServiceResult<IncidentReportDto>> UpdateFacilityIncidentStatusAsync(
+        int reportId,
+        UpdateIncidentStatusRequestDto request,
+        int managerId,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await _care.GetIncidentTrackedAsync(reportId, cancellationToken);
+        if (report is null)
+        {
+            return ServiceResult<IncidentReportDto>.Fail(ServiceErrorCodes.NotFound, "Không tìm thấy báo cáo sự cố.");
+        }
+
+        if (!IncidentTypes.IsFacility(report.IncidentType))
+        {
+            return ServiceResult<IncidentReportDto>.Fail(
+                ServiceErrorCodes.Validation,
+                IncidentTypes.IsHealth(report.IncidentType)
+                    ? "Sự cố sức khỏe ngựa do bác sĩ thú y xử lý."
+                    : "Manager chỉ xử lý sự cố chuồng trại / thiết bị.");
+        }
+
+        var current = IncidentStatuses.NormalizeOrDefault(report.Status);
+        var wanted = (request.TrangThai ?? string.Empty).Trim();
+        if (!IncidentStatuses.CanManagerTransition(current, wanted))
+        {
+            return ServiceResult<IncidentReportDto>.Fail(ServiceErrorCodes.InvalidStatus, "Không thể chuyển sang trạng thái này.");
+        }
+
+        var note = string.IsNullOrWhiteSpace(request.GhiChuXuLy) ? string.Empty : request.GhiChuXuLy.Trim();
+        if (note.Length > IncidentTypes.DescriptionMaxLength)
+        {
+            return ServiceResult<IncidentReportDto>.Fail(
+                ServiceErrorCodes.Validation,
+                $"Ghi chú tối đa {IncidentTypes.DescriptionMaxLength} ký tự.");
+        }
+
+        report.Status = wanted;
+        report.HandlingNote = note;
+        report.HandledBy = managerId;
+        report.HandledAt = _clock.GetUtcNow().UtcDateTime;
+        await _care.SaveAsync(cancellationToken);
+
+        var saved = await _care.GetIncidentTrackedAsync(reportId, cancellationToken) ?? report;
+        var stallByHorse = await StallByHorseAsync(cancellationToken);
+        return ServiceResult<IncidentReportDto>.Ok(MapIncident(saved, stallByHorse));
     }
 
     public async Task<IReadOnlyList<SupplyDto>> GetSuppliesAsync(CancellationToken cancellationToken = default)
@@ -427,7 +538,19 @@ public class CareService : ICareService
         Gio = task.ScheduledAt.HasValue ? ClockTime(task.ScheduledAt.Value) : string.Empty,
     };
 
-    private IncidentReportDto MapIncident(IncidentReport report) => new()
+    private async Task<Dictionary<int, string>> StallByHorseAsync(CancellationToken cancellationToken)
+    {
+        var today = LocalToday().ToDateTime(TimeOnly.MinValue);
+        var assignments = await _care.ListOpenAssignmentsAsync(today, cancellationToken);
+        return assignments
+            .Where(a => !IsClosedStable(a.Status))
+            .GroupBy(a => a.HorseId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(a => a.EndDate == null).ThenByDescending(a => a.StartDate).First().Stable.StableName);
+    }
+
+    private IncidentReportDto MapIncident(IncidentReport report, IReadOnlyDictionary<int, string>? stallByHorse = null) => new()
     {
         ReportID = report.ReportId,
         HorseID = report.HorseId,
@@ -436,6 +559,16 @@ public class CareService : ICareService
         MoTa = report.Description ?? string.Empty,
         HinhAnh = report.ImageUrl ?? string.Empty,
         Ngay = report.ReportedOn.ToString("yyyy-MM-dd"),
+        TrangThai = IncidentStatuses.NormalizeOrDefault(report.Status),
+        GhiChuXuLy = report.HandlingNote ?? string.Empty,
+        HandledBy = report.HandledBy,
+        HandledAt = report.HandledAt?.ToString("o"),
+        HorseName = report.Horse?.HorseName ?? string.Empty,
+        ReporterName = report.Groom?.FullName ?? string.Empty,
+        HandlerName = report.Handler?.FullName,
+        SoChuong = stallByHorse is not null && stallByHorse.TryGetValue(report.HorseId, out var stall)
+            ? stall
+            : string.Empty,
     };
 
     private static SupplyDto MapSupply(Supply supply) => new()

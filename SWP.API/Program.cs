@@ -41,9 +41,28 @@ namespace SWP.API
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
                         ClockSkew = TimeSpan.FromMinutes(1),
                     };
+
+                    // SignalR negotiate/WebSocket: JWT qua ?access_token=
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken)
+                                && path.StartsWithSegments("/hubs"))
+                            {
+                                context.Token = accessToken;
+                            }
+
+                            return Task.CompletedTask;
+                        },
+                    };
                 });
 
             builder.Services.AddAuthorization();
+            builder.Services.AddSignalR();
+            builder.Services.AddScoped<SWP.Application.Services.Interface.IHorseRealtimeNotifier, SWP.API.Realtime.HorseRealtimeNotifier>();
 
             builder.Services.AddCors(options =>
             {
@@ -158,6 +177,7 @@ namespace SWP.API
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapHub<SWP.API.Realtime.HorseActivityHub>("/hubs/horse-activity");
 
             app.Run();
         }

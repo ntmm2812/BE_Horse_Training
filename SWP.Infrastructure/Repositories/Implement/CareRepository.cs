@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SWP.Domain.Common;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Persistence;
 using SWP.Infrastructure.Repositories.Interface;
@@ -74,6 +75,42 @@ public class CareRepository : ICareRepository
             .ThenByDescending(r => r.ReportId)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<IncidentReport>> ListHealthIncidentsAsync(CancellationToken cancellationToken = default)
+    {
+        // Chỉ sự cố sức khỏe ngựa; loại trừ chuồng/thiết bị (và mọi loại khác)
+        return await _db.IncidentReports
+            .AsNoTracking()
+            .Include(r => r.Horse)
+            .Include(r => r.Groom)
+            .Include(r => r.Handler)
+            .Where(r =>
+                r.IncidentType == "Vết thương"
+                || r.IncidentType == "Khập khiễng"
+                || r.IncidentType == "Bỏ ăn")
+            .OrderByDescending(r => r.ReportedOn)
+            .ThenByDescending(r => r.ReportId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<IncidentReport>> ListAllIncidentsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _db.IncidentReports
+            .AsNoTracking()
+            .Include(r => r.Horse)
+            .Include(r => r.Groom)
+            .Include(r => r.Handler)
+            .OrderByDescending(r => r.ReportedOn)
+            .ThenByDescending(r => r.ReportId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<IncidentReport?> GetIncidentTrackedAsync(int reportId, CancellationToken cancellationToken = default) =>
+        _db.IncidentReports
+            .Include(r => r.Horse)
+            .Include(r => r.Groom)
+            .Include(r => r.Handler)
+            .FirstOrDefaultAsync(r => r.ReportId == reportId, cancellationToken);
 
     public void AddIncident(IncidentReport report) => _db.IncidentReports.Add(report);
 

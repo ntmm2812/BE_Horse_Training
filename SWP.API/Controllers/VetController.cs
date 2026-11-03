@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SWP.Application.Common;
+using SWP.Application.DTOs.Care;
 using SWP.Application.DTOs.Veterinary;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
@@ -15,10 +16,17 @@ namespace SWP.API.Controllers;
 public class VetController : ControllerBase
 {
     private readonly IVeterinaryService _veterinaryService;
+    private readonly ICareService _careService;
+    private readonly IHorseRealtimeNotifier _realtime;
 
-    public VetController(IVeterinaryService veterinaryService)
+    public VetController(
+        IVeterinaryService veterinaryService,
+        ICareService careService,
+        IHorseRealtimeNotifier realtime)
     {
         _veterinaryService = veterinaryService;
+        _careService = careService;
+        _realtime = realtime;
     }
 
     [HttpGet("medical-records")]
@@ -90,6 +98,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.Record.HorseID, HorseRealtimeKinds.KhamBenh, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result.Data);
     }
 
@@ -111,6 +120,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.Record.HorseID, HorseRealtimeKinds.KhamBenh, cancellationToken);
         return Ok(result.Data);
     }
 
@@ -144,6 +154,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.KhoaTap, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result.Data);
     }
 
@@ -165,6 +176,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.KhoaTap, cancellationToken);
         return Ok(result.Data);
     }
 
@@ -211,6 +223,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.TiemPhong, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result.Data);
     }
 
@@ -227,6 +240,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.TiemPhong, cancellationToken);
         return Ok(result.Data);
     }
 
@@ -234,10 +248,16 @@ public class VetController : ControllerBase
     [Authorize(Roles = RoleNames.Veterinarian)]
     public async Task<IActionResult> DeleteVaccination(int scheduleId, CancellationToken cancellationToken)
     {
+        var existing = await _veterinaryService.GetVaccinationAsync(scheduleId, null, cancellationToken);
         var result = await _veterinaryService.DeleteVaccinationAsync(scheduleId, cancellationToken);
         if (!result.Success)
         {
             return Error(result);
+        }
+
+        if (existing.Success && existing.Data is not null)
+        {
+            await _realtime.NotifyHorseChangedAsync(existing.Data.HorseID, HorseRealtimeKinds.TiemPhong, cancellationToken);
         }
 
         return NoContent();
@@ -256,6 +276,7 @@ public class VetController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.Item.HorseID, HorseRealtimeKinds.TiemPhong, cancellationToken);
         return Ok(result.Data);
     }
 
@@ -281,6 +302,37 @@ public class VetController : ControllerBase
     {
         var ids = await _veterinaryService.GetRelatedHorseIdsAsync(cancellationToken);
         return Ok(ids);
+    }
+
+    // Sự cố sức khỏe ngựa (Vết thương / Khập khiễng / Bỏ ăn) do groom báo — bác sĩ thú y xử lý.
+    [HttpGet("incidents")]
+    [Authorize(Roles = RoleNames.Veterinarian)]
+    public async Task<IActionResult> GetHealthIncidents(CancellationToken cancellationToken)
+    {
+        var reports = await _careService.GetHealthIncidentsForVetAsync(cancellationToken);  
+        return Ok(reports);
+    }
+
+    [HttpPost("incidents/{reportId:int}/status")]
+    [Authorize(Roles = RoleNames.Veterinarian)]
+    public async Task<IActionResult> UpdateHealthIncidentStatus(
+        int reportId,
+        [FromBody] UpdateIncidentStatusRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var vetId))
+        {
+            return UnknownUser();
+        }
+
+        var result = await _careService.UpdateHealthIncidentStatusAsync(reportId, request, vetId, cancellationToken);
+        if (!result.Success)
+        {
+            return Error(result);
+        }
+
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.SuCo, cancellationToken);
+        return Ok(result.Data);
     }
 
     private IActionResult Error<T>(ServiceResult<T> result)

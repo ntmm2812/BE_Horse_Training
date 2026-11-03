@@ -70,8 +70,21 @@ public class HorseService : IHorseService
         var careTasks = await _horseRepository.GetDailyCareTasksAsync(horseId, cancellationToken);
         var feeding = await _horseRepository.GetActiveFeedingDetailsAsync(horseId, cancellationToken);
         var races = await _horseRepository.GetRaceAchievementsAsync(horseId, cancellationToken);
+        var sessions = await _horseRepository.GetTrainingSessionsForHorseAsync(horseId, cancellationToken);
+        var vaccinations = await _horseRepository.GetVaccinationsForHorseAsync(horseId, cancellationToken);
+        var medicalRecords = await _horseRepository.GetMedicalRecordsForHorseAsync(horseId, cancellationToken);
+        var trainingLocks = await _horseRepository.GetTrainingLocksForHorseAsync(horseId, cancellationToken);
 
-        return OwnerHorseDetailMapper.ToDetailDto(horse, stable, careTasks, feeding, races);
+        return OwnerHorseDetailMapper.ToDetailDto(
+            horse,
+            stable,
+            careTasks,
+            feeding,
+            races,
+            sessions,
+            vaccinations,
+            medicalRecords,
+            trainingLocks);
     }
 
     public async Task<IReadOnlyList<HorseOwnerDto>> GetHorseOwnersAsync(CancellationToken cancellationToken = default)

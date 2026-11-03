@@ -15,10 +15,12 @@ namespace SWP.API.Controllers;
 public class GroomController : ControllerBase
 {
     private readonly ICareService _careService;
+    private readonly IHorseRealtimeNotifier _realtime;
 
-    public GroomController(ICareService careService)
+    public GroomController(ICareService careService, IHorseRealtimeNotifier realtime)
     {
         _careService = careService;
+        _realtime = realtime;
     }
 
     [HttpGet("tasks")]
@@ -46,6 +48,7 @@ public class GroomController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.ChamSoc, cancellationToken);
         return Ok(result.Data);
     }
 
@@ -88,6 +91,7 @@ public class GroomController : ControllerBase
             return Error(result);
         }
 
+        await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.SuCo, cancellationToken);
         return Ok(result.Data);
     }
 

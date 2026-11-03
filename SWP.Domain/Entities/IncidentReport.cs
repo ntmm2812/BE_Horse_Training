@@ -18,7 +18,17 @@ public class IncidentReport
 
     public DateTime CreatedAt { get; set; }
 
+    public string Status { get; set; } = "Mới";
+
+    public string? HandlingNote { get; set; }
+
+    public int? HandledBy { get; set; }
+
+    public DateTime? HandledAt { get; set; }
+
     public virtual Horse Horse { get; set; } = null!;
 
     public virtual User Groom { get; set; } = null!;
+
+    public virtual User? Handler { get; set; }
 }

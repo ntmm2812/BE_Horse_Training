@@ -18,6 +18,10 @@ public class IncidentReportConfiguration : IEntityTypeConfiguration<IncidentRepo
         entity.Property(e => e.ImageUrl).HasColumnName("HinhAnh");
         entity.Property(e => e.ReportedOn).HasColumnName("Ngay").HasColumnType("date");
         entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+        entity.Property(e => e.Status).HasColumnName("TrangThai").HasMaxLength(30).HasDefaultValue("Mới");
+        entity.Property(e => e.HandlingNote).HasColumnName("GhiChuXuLy").HasMaxLength(300);
+        entity.Property(e => e.HandledBy).HasColumnName("HandledBy");
+        entity.Property(e => e.HandledAt).HasColumnType("datetime");
 
         entity.HasOne(d => d.Horse)
             .WithMany(p => p.IncidentReports)
@@ -27,6 +31,11 @@ public class IncidentReportConfiguration : IEntityTypeConfiguration<IncidentRepo
         entity.HasOne(d => d.Groom)
             .WithMany(p => p.IncidentReports)
             .HasForeignKey(d => d.GroomId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne(d => d.Handler)
+            .WithMany()
+            .HasForeignKey(d => d.HandledBy)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

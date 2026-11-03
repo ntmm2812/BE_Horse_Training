@@ -33,4 +33,20 @@ public interface IHorseRepository
     Task<IReadOnlyList<(RaceRegistration Registration, Race Race)>> GetRaceAchievementsAsync(
         int horseId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TrainingSchedule>> GetTrainingSessionsForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<VaccinationSchedule>> GetVaccinationsForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MedicalRecord>> GetMedicalRecordsForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TrainingLock>> GetTrainingLocksForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default);
 }

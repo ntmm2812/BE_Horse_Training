@@ -23,6 +23,12 @@ public interface ICareRepository
 
     Task<IReadOnlyList<IncidentReport>> ListIncidentsAsync(int groomId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<IncidentReport>> ListHealthIncidentsAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<IncidentReport>> ListAllIncidentsAsync(CancellationToken cancellationToken = default);
+
+    Task<IncidentReport?> GetIncidentTrackedAsync(int reportId, CancellationToken cancellationToken = default);
+
     void AddIncident(IncidentReport report);
 
     Task<IReadOnlyList<Supply>> ListSuppliesAsync(CancellationToken cancellationToken = default);

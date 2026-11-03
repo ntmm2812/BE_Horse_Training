@@ -19,6 +19,8 @@ public class CareTaskDto
 
 public class StableAssignmentDto
 {
+    public int AssignmentID { get; set; }
+
     public int StableID { get; set; }
 
     public int HorseID { get; set; }
@@ -58,6 +60,22 @@ public class IncidentReportDto
     public string HinhAnh { get; set; } = string.Empty;
 
     public string Ngay { get; set; } = string.Empty;
+
+    public string TrangThai { get; set; } = "Mới";
+
+    public string GhiChuXuLy { get; set; } = string.Empty;
+
+    public int? HandledBy { get; set; }
+
+    public string? HandledAt { get; set; }
+
+    public string HorseName { get; set; } = string.Empty;
+
+    public string ReporterName { get; set; } = string.Empty;
+
+    public string? HandlerName { get; set; }
+
+    public string SoChuong { get; set; } = string.Empty;
 }
 
 public class CreateIncidentReportRequestDto
@@ -71,6 +89,13 @@ public class CreateIncidentReportRequestDto
     public string? HinhAnh { get; set; }
 
     public DateOnly Ngay { get; set; }
+}
+
+public class UpdateIncidentStatusRequestDto
+{
+    public string? TrangThai { get; set; }
+
+    public string? GhiChuXuLy { get; set; }
 }
 
 public class SupplyDto

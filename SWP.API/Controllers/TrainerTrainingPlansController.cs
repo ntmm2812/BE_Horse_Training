@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SWP.Application.Common;
 using SWP.Application.DTOs.Training;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
@@ -14,13 +15,16 @@ public class TrainerTrainingPlansController : TrainingControllerBase
 {
     private readonly ITrainingPlanService _trainingPlanService;
     private readonly ITrainingSessionService _trainingSessionService;
+    private readonly IHorseRealtimeNotifier _realtime;
 
     public TrainerTrainingPlansController(
         ITrainingPlanService trainingPlanService,
-        ITrainingSessionService trainingSessionService)
+        ITrainingSessionService trainingSessionService,
+        IHorseRealtimeNotifier realtime)
     {
         _trainingPlanService = trainingPlanService;
         _trainingSessionService = trainingSessionService;
+        _realtime = realtime;
     }
 
     /// <summary> Danh mục mã + nhãn tiếng Việt cho các dropdown của FE. </summary>
@@ -55,7 +59,7 @@ public class TrainerTrainingPlansController : TrainingControllerBase
         }
 
         var result = await _trainingPlanService.CreateAsync(request, userId, cancellationToken);
-        return FromResult(result, StatusCodes.Status201Created);
+        return await FromPlanResultNotify(result, StatusCodes.Status201Created, cancellationToken);
     }
 
     [HttpPut("{planId:int}")]
@@ -65,13 +69,19 @@ public class TrainerTrainingPlansController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingPlanService.UpdateAsync(planId, request, cancellationToken);
-        return FromResult(result);
+        return await FromPlanResultNotify(result, StatusCodes.Status200OK, cancellationToken);
     }
 
     [HttpDelete("{planId:int}")]
     public async Task<IActionResult> Delete(int planId, CancellationToken cancellationToken)
     {
+        var existing = await _trainingPlanService.GetDetailAsync(planId, cancellationToken);
         var result = await _trainingPlanService.DeleteAsync(planId, cancellationToken);
+        if (result.Success && existing.Success && existing.Data is not null)
+        {
+            await _realtime.NotifyHorseChangedAsync(existing.Data.HorseId, HorseRealtimeKinds.TapLuyen, cancellationToken);
+        }
+
         return NoContentFrom(result);
     }
 
@@ -79,21 +89,21 @@ public class TrainerTrainingPlansController : TrainingControllerBase
     public async Task<IActionResult> Activate(int planId, CancellationToken cancellationToken)
     {
         var result = await _trainingPlanService.ActivateAsync(planId, cancellationToken);
-        return FromResult(result);
+        return await FromPlanResultNotify(result, StatusCodes.Status200OK, cancellationToken);
     }
 
     [HttpPost("{planId:int}/complete")]
     public async Task<IActionResult> Complete(int planId, CancellationToken cancellationToken)
     {
         var result = await _trainingPlanService.CompleteAsync(planId, cancellationToken);
-        return FromResult(result);
+        return await FromPlanResultNotify(result, StatusCodes.Status200OK, cancellationToken);
     }
 
     [HttpPost("{planId:int}/cancel")]
     public async Task<IActionResult> Cancel(int planId, CancellationToken cancellationToken)
     {
         var result = await _trainingPlanService.CancelAsync(planId, cancellationToken);
-        return FromResult(result);
+        return await FromPlanResultNotify(result, StatusCodes.Status200OK, cancellationToken);
     }
 
     /// <summary> Sinh lịch tập 1 tuần từ các giai đoạn (có xem trước bằng previewOnly). </summary>
@@ -104,6 +114,15 @@ public class TrainerTrainingPlansController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingPlanService.GenerateWeeklyScheduleAsync(planId, request, cancellationToken);
+        if (result.Success && !request.PreviewOnly)
+        {
+            var plan = await _trainingPlanService.GetDetailAsync(planId, cancellationToken);
+            if (plan.Success && plan.Data is not null)
+            {
+                await _realtime.NotifyHorseChangedAsync(plan.Data.HorseId, HorseRealtimeKinds.TapLuyen, cancellationToken);
+            }
+        }
+
         return FromResult(result, request.PreviewOnly ? StatusCodes.Status200OK : StatusCodes.Status201Created);
     }
 
@@ -115,6 +134,25 @@ public class TrainerTrainingPlansController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingSessionService.CreateAsync(planId, request, cancellationToken);
+        if (result.Success && result.Data is not null)
+        {
+            await _realtime.NotifyHorseChangedAsync(result.Data.HorseId, HorseRealtimeKinds.TapLuyen, cancellationToken);
+        }
+
         return FromResult(result, StatusCodes.Status201Created);
+    }
+
+    private async Task<IActionResult> FromPlanResultNotify<T>(
+        ServiceResult<T> result,
+        int successStatusCode,
+        CancellationToken cancellationToken)
+        where T : TrainingPlanDto
+    {
+        if (result.Success && result.Data is not null)
+        {
+            await _realtime.NotifyHorseChangedAsync(result.Data.HorseId, HorseRealtimeKinds.TapLuyen, cancellationToken);
+        }
+
+        return FromResult(result, successStatusCode);
     }
 }

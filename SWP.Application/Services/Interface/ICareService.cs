@@ -15,9 +15,25 @@ public interface ICareService
 
     Task<IReadOnlyList<IncidentReportDto>> GetIncidentsAsync(int groomId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<IncidentReportDto>> GetHealthIncidentsForVetAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<IncidentReportDto>> GetAllIncidentsForManagerAsync(CancellationToken cancellationToken = default);
+
     Task<ServiceResult<IncidentReportDto>> CreateIncidentAsync(
         CreateIncidentReportRequestDto request,
         int groomId,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<IncidentReportDto>> UpdateHealthIncidentStatusAsync(
+        int reportId,
+        UpdateIncidentStatusRequestDto request,
+        int vetId,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<IncidentReportDto>> UpdateFacilityIncidentStatusAsync(
+        int reportId,
+        UpdateIncidentStatusRequestDto request,
+        int managerId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SupplyDto>> GetSuppliesAsync(CancellationToken cancellationToken = default);
