@@ -8,15 +8,14 @@ public class VaccinationScheduleConfiguration : IEntityTypeConfiguration<Vaccina
 {
     public void Configure(EntityTypeBuilder<VaccinationSchedule> entity)
     {
-        entity.HasKey(e => e.ScheduleId);
         entity.ToTable("VaccinationSchedule");
-
-        entity.Property(e => e.ScheduleId).HasColumnName("ScheduleID");
+        entity.HasKey(e => e.ScheduleId);
+        entity.Property(e => e.ScheduleId).HasColumnName("ScheduleID").ValueGeneratedOnAdd();
         entity.Property(e => e.HorseId).HasColumnName("HorseID");
-        entity.Property(e => e.Loai).HasMaxLength(50).IsRequired();
-        entity.Property(e => e.NgayHen).HasColumnType("date");
-        entity.Property(e => e.TrangThai).HasMaxLength(30).IsRequired();
-        entity.Property(e => e.GhiChu).HasMaxLength(500);
+        entity.Property(e => e.VaccineType).HasColumnName("Loai").HasMaxLength(50);
+        entity.Property(e => e.DueDate).HasColumnName("NgayHen").HasColumnType("date");
+        entity.Property(e => e.Status).HasColumnName("TrangThai").HasMaxLength(20);
+        entity.Property(e => e.CreatedAt).HasColumnType("datetime");
 
         entity.HasOne(d => d.Horse)
             .WithMany(p => p.VaccinationSchedules)

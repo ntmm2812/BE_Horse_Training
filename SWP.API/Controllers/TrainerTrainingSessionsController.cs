@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SWP.Application.Common;
 using SWP.Application.DTOs.Training;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
@@ -13,10 +14,14 @@ namespace SWP.API.Controllers;
 public class TrainerTrainingSessionsController : TrainingControllerBase
 {
     private readonly ITrainingSessionService _trainingSessionService;
+    private readonly IHorseRealtimeNotifier _realtime;
 
-    public TrainerTrainingSessionsController(ITrainingSessionService trainingSessionService)
+    public TrainerTrainingSessionsController(
+        ITrainingSessionService trainingSessionService,
+        IHorseRealtimeNotifier realtime)
     {
         _trainingSessionService = trainingSessionService;
+        _realtime = realtime;
     }
 
     /// <summary> Lịch tập theo khoảng ngày (mặc định 7 ngày từ hôm nay), lọc theo ngựa/giáo án/người phụ trách/trạng thái. </summary>
@@ -49,7 +54,7 @@ public class TrainerTrainingSessionsController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingSessionService.UpdateAsync(sessionId, request, cancellationToken);
-        return FromResult(result);
+        return await FromResultNotify(result, HorseRealtimeKinds.TapLuyen, cancellationToken);
     }
 
     [HttpPut("{sessionId:int}/assignment")]
@@ -59,14 +64,14 @@ public class TrainerTrainingSessionsController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingSessionService.AssignAsync(sessionId, request, cancellationToken);
-        return FromResult(result);
+        return await FromResultNotify(result, HorseRealtimeKinds.TapLuyen, cancellationToken);
     }
 
     [HttpPost("{sessionId:int}/start")]
     public async Task<IActionResult> Start(int sessionId, CancellationToken cancellationToken)
     {
         var result = await _trainingSessionService.StartAsync(sessionId, cancellationToken);
-        return FromResult(result);
+        return await FromResultNotify(result, HorseRealtimeKinds.TapLuyen, cancellationToken);
     }
 
     /// <summary> Ghi nhận chỉ số, điểm phong độ và nhận xét chuyên môn sau buổi tập. </summary>
@@ -77,7 +82,7 @@ public class TrainerTrainingSessionsController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingSessionService.CompleteAsync(sessionId, request, cancellationToken);
-        return FromResult(result);
+        return await FromResultNotify(result, HorseRealtimeKinds.TapLuyen, cancellationToken);
     }
 
     [HttpPost("{sessionId:int}/cancel")]
@@ -87,13 +92,32 @@ public class TrainerTrainingSessionsController : TrainingControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _trainingSessionService.CancelAsync(sessionId, request, cancellationToken);
-        return FromResult(result);
+        return await FromResultNotify(result, HorseRealtimeKinds.TapLuyen, cancellationToken);
     }
 
     [HttpDelete("{sessionId:int}")]
     public async Task<IActionResult> Delete(int sessionId, CancellationToken cancellationToken)
     {
+        var existing = await _trainingSessionService.GetByIdAsync(sessionId, cancellationToken);
         var result = await _trainingSessionService.DeleteAsync(sessionId, cancellationToken);
+        if (result.Success && existing.Success && existing.Data is not null)
+        {
+            await _realtime.NotifyHorseChangedAsync(existing.Data.HorseId, HorseRealtimeKinds.TapLuyen, cancellationToken);
+        }
+
         return NoContentFrom(result);
+    }
+
+    private async Task<IActionResult> FromResultNotify(
+        ServiceResult<TrainingSessionDto> result,
+        string kind,
+        CancellationToken cancellationToken)
+    {
+        if (result.Success && result.Data is not null)
+        {
+            await _realtime.NotifyHorseChangedAsync(result.Data.HorseId, kind, cancellationToken);
+        }
+
+        return FromResult(result);
     }
 }

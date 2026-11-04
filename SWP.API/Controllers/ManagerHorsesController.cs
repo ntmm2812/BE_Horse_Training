@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SWP.Application.Common;
 using SWP.Application.DTOs.Horses;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
@@ -12,10 +13,12 @@ namespace SWP.API.Controllers;
 public class ManagerHorsesController : ControllerBase
 {
     private readonly IHorseService _horseService;
+    private readonly IHorseRealtimeNotifier _realtime;
 
-    public ManagerHorsesController(IHorseService horseService)
+    public ManagerHorsesController(IHorseService horseService, IHorseRealtimeNotifier realtime)
     {
         _horseService = horseService;
+        _realtime = realtime;
     }
 
     [HttpGet("owners")]
@@ -34,6 +37,7 @@ public class ManagerHorsesController : ControllerBase
             return BadRequest(new { message = error });
         }
 
+        await _realtime.NotifyHorseChangedAsync(data!.HorseID, HorseRealtimeKinds.HoSo, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, data);
     }
 
@@ -51,6 +55,7 @@ public class ManagerHorsesController : ControllerBase
                 : BadRequest(new { message = error });
         }
 
+        await _realtime.NotifyHorseChangedAsync(horseId, HorseRealtimeKinds.HoSo, cancellationToken);
         return Ok(data);
     }
 
@@ -81,16 +86,23 @@ public class ManagerHorsesController : ControllerBase
                 : BadRequest(new { message = error });
         }
 
+        await _realtime.NotifyHorseChangedAsync(horseId, HorseRealtimeKinds.HoSo, cancellationToken);
         return Ok(data);
     }
 
     [HttpDelete("{horseId:int}")]
     public async Task<IActionResult> Delete(int horseId, CancellationToken cancellationToken)
     {
+        var existing = await _horseService.GetByIdAsync(horseId, cancellationToken);
         var deleted = await _horseService.DeleteAsync(horseId, cancellationToken);
         if (!deleted)
         {
             return NotFound(new { message = "Không tìm thấy ngựa." });
+        }
+
+        if (existing is not null)
+        {
+            await _realtime.NotifyOwnerAsync(existing.OwnerID, horseId, HorseRealtimeKinds.HoSo, cancellationToken);
         }
 
         return NoContent();

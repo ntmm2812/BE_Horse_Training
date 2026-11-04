@@ -1,8 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
@@ -10,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Persistence;
 using SWP.Infrastructure.Security.Interface;
@@ -18,7 +15,7 @@ using SWP.Infrastructure.Security.Interface;
 namespace SWP.Tests.Support;
 
 /// <summary> Chạy API thật (Program.cs) trên SQLite in-memory với đồng hồ cố định. </summary>
-public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
+public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -41,8 +38,6 @@ public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
     {
         _connection.Open();
         builder.UseEnvironment("Development");
-        // Test không phụ thuộc quyền ghi Windows Event Log của máy chạy.
-        builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
@@ -51,8 +46,6 @@ public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
 
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
-
-            services.AddTransient<IStartupFilter, TestBufferStartupFilter>();
         });
     }
 
@@ -109,33 +102,5 @@ public class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
             db.Database.EnsureCreated();
             _ids = TestData.SeedBasics(db);
         }
-    }
-}
-
-public sealed class TestBufferStartupFilter : IStartupFilter
-{
-    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
-    {
-        return app =>
-        {
-            app.Use(async (context, nextMiddleware) =>
-            {
-                var originalBody = context.Response.Body;
-                using var memoryStream = new MemoryStream();
-                context.Response.Body = memoryStream;
-                try
-                {
-                    await nextMiddleware();
-                }
-                finally
-                {
-                    memoryStream.Position = 0;
-                    await memoryStream.CopyToAsync(originalBody);
-                    context.Response.Body = originalBody;
-                }
-            });
-
-            next(app);
-        };
     }
 }

@@ -62,6 +62,16 @@ public sealed class TrainingTestContext : IDisposable
 
     public HorseFitnessService FitnessService() => FitnessService(NewContext());
 
+    public VeterinaryService VetService()
+    {
+        var db = NewContext();
+        return new VeterinaryService(new VeterinaryRepository(db), new UserRepository(db), Clock);
+    }
+
+    public CareService CareService() => new(new CareRepository(NewContext()), Clock);
+
+    public RaceService RaceService() => new(new RaceRepository(NewContext()), Clock);
+
     public TrainingPlanService PlanService()
     {
         var db = NewContext();
@@ -86,15 +96,6 @@ public sealed class TrainingTestContext : IDisposable
             Clock);
     }
 
-    public MedicalService MedicalService()
-    {
-        var db = NewContext();
-        return new MedicalService(
-            new MedicalRepository(db),
-            new HorseRepository(db),
-            new HorseHealthStatusRepository(db));
-    }
-
     /// <summary> Tạo giáo án 3 giai đoạn qua service và áp dụng (Active). </summary>
     public async Task<int> CreateActivePlanAsync(int horseId)
     {
@@ -116,5 +117,5 @@ public sealed class TrainingTestContext : IDisposable
     }
 
     private HorseFitnessService FitnessService(ApplicationDbContext db) =>
-        new(new HorseRepository(db), new HorseHealthStatusRepository(db), new TrainingSessionRepository(db), Clock, new MedicalRepository(db));
+        new(new HorseRepository(db), new HorseHealthStatusRepository(db), new TrainingSessionRepository(db), Clock);
 }

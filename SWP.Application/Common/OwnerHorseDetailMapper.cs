@@ -1,5 +1,6 @@
 using System.Globalization;
 using SWP.Application.DTOs.Horses;
+using SWP.Domain.Common;
 using SWP.Domain.Models.Entity;
 
 namespace SWP.Application.Common;
@@ -11,7 +12,11 @@ public static class OwnerHorseDetailMapper
         string? stableLabel,
         IReadOnlyList<CareTask> careTasks,
         IReadOnlyList<FeedingPlanDetail> feedingDetails,
-        IReadOnlyList<(RaceRegistration Registration, Race Race)> races)
+        IReadOnlyList<(RaceRegistration Registration, Race Race)> races,
+        IReadOnlyList<TrainingSchedule> sessions,
+        IReadOnlyList<VaccinationSchedule> vaccinations,
+        IReadOnlyList<MedicalRecord> medicalRecords,
+        IReadOnlyList<TrainingLock> trainingLocks)
     {
         return new OwnerHorseDetailDto
         {
@@ -29,6 +34,7 @@ public static class OwnerHorseDetailMapper
             LichSinhHoat = MapSchedule(careTasks),
             KhauPhan = MapDiet(feedingDetails),
             ThanhTichThiDau = MapRaces(races),
+            HoatDong = MapActivities(sessions, races, vaccinations, medicalRecords, trainingLocks),
         };
     }
 
@@ -97,11 +103,130 @@ public static class OwnerHorseDetailMapper
             .ToList();
     }
 
+    private static IReadOnlyList<OwnerHorseActivityDto> MapActivities(
+        IReadOnlyList<TrainingSchedule> sessions,
+        IReadOnlyList<(RaceRegistration Registration, Race Race)> races,
+        IReadOnlyList<VaccinationSchedule> vaccinations,
+        IReadOnlyList<MedicalRecord> medicalRecords,
+        IReadOnlyList<TrainingLock> trainingLocks)
+    {
+        var now = DateTime.UtcNow;
+        var items = new List<(DateTime SortAt, OwnerHorseActivityDto Activity)>();
+
+        foreach (var session in sessions)
+        {
+            var title = !string.IsNullOrWhiteSpace(session.SessionTitle)
+                ? session.SessionTitle!
+                : (!string.IsNullOrWhiteSpace(session.TrainingType) ? session.TrainingType! : "Buổi tập");
+
+            var statusLabel = TrainingSessionStatuses.TryNormalize(session.Status, out var normalized)
+                && TrainingSessionStatuses.Labels.TryGetValue(normalized, out var label)
+                    ? label
+                    : session.Status;
+
+            items.Add((
+                session.TrainingDate,
+                new OwnerHorseActivityDto
+                {
+                    Ngay = FormatActivityDate(session.TrainingDate),
+                    Loai = "TapLuyen",
+                    TieuDe = title,
+                    ChiTiet = statusLabel,
+                }));
+        }
+
+        foreach (var (registration, race) in races)
+        {
+            var raceAt = race.RaceDate ?? registration.CreatedAt;
+            items.Add((
+                raceAt,
+                new OwnerHorseActivityDto
+                {
+                    Ngay = FormatActivityDate(raceAt),
+                    Loai = "ThiDau",
+                    TieuDe = race.RaceName,
+                    ChiTiet = ResolveRaceStatus(registration, race, now),
+                }));
+        }
+
+        foreach (var vaccine in vaccinations)
+        {
+            var at = vaccine.DueDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
+            items.Add((
+                at,
+                new OwnerHorseActivityDto
+                {
+                    Ngay = vaccine.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    Loai = "TiemPhong",
+                    TieuDe = vaccine.VaccineType,
+                    ChiTiet = vaccine.Status,
+                }));
+        }
+
+        foreach (var record in medicalRecords)
+        {
+            items.Add((
+                record.RecordDate,
+                new OwnerHorseActivityDto
+                {
+                    Ngay = FormatActivityDate(record.RecordDate),
+                    Loai = "KhamBenh",
+                    TieuDe = "Đã khám",
+                    ChiTiet = null,
+                }));
+        }
+
+        foreach (var trainingLock in trainingLocks)
+        {
+            var placedAt = trainingLock.PlacedOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
+            items.Add((
+                placedAt,
+                new OwnerHorseActivityDto
+                {
+                    Ngay = trainingLock.PlacedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    Loai = "KhoaTap",
+                    TieuDe = "Tạm ngưng huấn luyện",
+                    ChiTiet = trainingLock.ReleasedOn is null ? "Đang khóa" : "Đã khóa",
+                }));
+
+            if (trainingLock.ReleasedOn is { } releasedOn)
+            {
+                var releasedAt = releasedOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
+                items.Add((
+                    releasedAt,
+                    new OwnerHorseActivityDto
+                    {
+                        Ngay = releasedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        Loai = "KhoaTap",
+                        TieuDe = "Mở lại huấn luyện",
+                        ChiTiet = null,
+                    }));
+            }
+        }
+
+        return items
+            .OrderByDescending(x => x.SortAt)
+            .ThenBy(x => x.Activity.Loai)
+            .Select(x => x.Activity)
+            .ToList();
+    }
+
+    private static string FormatActivityDate(DateTime value)
+    {
+        var local = value.Kind == DateTimeKind.Utc ? value.ToLocalTime() : value;
+        return local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
     private static string ResolveRaceStatus(RaceRegistration reg, Race race, DateTime nowUtc)
     {
         if (reg.FinishPosition is > 0)
         {
             return $"Hạng {reg.FinishPosition}";
+        }
+
+        if (reg.FinishPosition == 0)
+        {
+            return "Không xếp hạng";
         }
 
         if (race.RaceDate.HasValue && race.RaceDate.Value > nowUtc)

@@ -41,9 +41,28 @@ namespace SWP.API
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
                         ClockSkew = TimeSpan.FromMinutes(1),
                     };
+
+                    // SignalR negotiate/WebSocket: JWT qua ?access_token=
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken)
+                                && path.StartsWithSegments("/hubs"))
+                            {
+                                context.Token = accessToken;
+                            }
+
+                            return Task.CompletedTask;
+                        },
+                    };
                 });
 
             builder.Services.AddAuthorization();
+            builder.Services.AddSignalR();
+            builder.Services.AddScoped<SWP.Application.Services.Interface.IHorseRealtimeNotifier, SWP.API.Realtime.HorseRealtimeNotifier>();
 
             builder.Services.AddCors(options =>
             {
@@ -108,6 +127,41 @@ namespace SWP.API
                     : "Ảnh ngựa: lưu local wwwroot/media (chưa đủ Cloudinary:ApiSecret — xem appsettings.Local.json).",
                 cloudinaryConfig?.Folder ?? "swp-horses");
 
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                // Script T-SQL chỉ chạy trên SQL Server (test tích hợp dùng SQLite in-memory).
+                if (db.Database.IsSqlServer())
+                {
+                    db.Database.ExecuteSqlRaw("""
+                        IF COL_LENGTH('Horse', 'ImageURL') IS NULL
+                            ALTER TABLE [Horse] ADD [ImageURL] VARCHAR(500) NULL;
+
+                        IF OBJECT_ID(N'HorseHealthStatus', N'U') IS NULL
+                        BEGIN
+                            CREATE TABLE [HorseHealthStatus] (
+                                [HorseID] INT NOT NULL PRIMARY KEY,
+                                [TrangThai] NVARCHAR(30) NOT NULL,
+                                [NgayCapNhat] DATETIME NOT NULL,
+                                CONSTRAINT [FK_HorseHealthStatus_Horse] FOREIGN KEY ([HorseID]) REFERENCES [Horse]([HorseID]) ON DELETE CASCADE
+                            );
+                        END;
+
+                        INSERT INTO [HorseHealthStatus] ([HorseID], [TrangThai], [NgayCapNhat])
+                        SELECT h.[HorseID], N'Đủ điều kiện', GETUTCDATE()
+                        FROM [Horse] h
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM [HorseHealthStatus] s WHERE s.[HorseID] = h.[HorseID]
+                        );
+                        """);
+
+                    TrainingSchemaUpdater.Apply(db);
+                    VeterinarySchemaUpdater.Apply(db);
+                    CareSchemaUpdater.Apply(db);
+                    RaceSchemaUpdater.Apply(db);
+                }
+            }
+
             var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
             Directory.CreateDirectory(Path.Combine(webRoot, "media", "swp-horses"));
 
@@ -123,6 +177,7 @@ namespace SWP.API
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapHub<SWP.API.Realtime.HorseActivityHub>("/hubs/horse-activity");
 
             app.Run();
         }

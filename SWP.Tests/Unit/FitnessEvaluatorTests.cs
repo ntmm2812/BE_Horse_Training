@@ -26,7 +26,6 @@ public class FitnessEvaluatorTests
     [Theory]
     [InlineData(HorseHealthStatuses.CachLy, null, FitnessReadiness.NotAllowed)]
     [InlineData(HorseHealthStatuses.ChanThuong, TrainingIntensityLevels.Recovery, FitnessReadiness.RecoveryOnly)]
-    [InlineData(HorseHealthStatuses.DangDieuTri, TrainingIntensityLevels.Recovery, FitnessReadiness.RecoveryOnly)]
     [InlineData(HorseHealthStatuses.CanTheoDoi, TrainingIntensityLevels.Low, FitnessReadiness.Limited)]
     [InlineData(null, TrainingIntensityLevels.Medium, FitnessReadiness.Limited)]
     [InlineData("Trạng thái lạ", TrainingIntensityLevels.Medium, FitnessReadiness.Limited)]
@@ -52,7 +51,7 @@ public class FitnessEvaluatorTests
     }
 
     [Fact]
-    public void VeterinarianLock_BlocksAllTraining_AndShowsReason()
+    public void VeterinarianLock_AllowsRecoveryOnly_AndShowsReason()
     {
         var result = FitnessEvaluator.Evaluate(Healthy() with
         {
@@ -60,9 +59,9 @@ public class FitnessEvaluatorTests
             LockReason = "Viêm gân chân trước",
         });
 
-        Assert.False(result.CanTrain);
-        Assert.Null(result.MaxAllowedIntensity);
-        Assert.Equal(FitnessReadiness.NotAllowed, result.Readiness);
+        Assert.True(result.CanTrain);
+        Assert.Equal(TrainingIntensityLevels.Recovery, result.MaxAllowedIntensity);
+        Assert.Equal(FitnessReadiness.RecoveryOnly, result.Readiness);
         Assert.Contains("Viêm gân chân trước", result.Warnings.Single());
     }
 

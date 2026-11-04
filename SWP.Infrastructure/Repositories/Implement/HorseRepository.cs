@@ -150,4 +150,52 @@ public class HorseRepository : IHorseRepository
 
         return rows.Select(x => (x.Registration, x.Race)).ToList();
     }
+
+    public async Task<IReadOnlyList<TrainingSchedule>> GetTrainingSessionsForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.TrainingSchedules
+            .AsNoTracking()
+            .Where(s => s.Plan.HorseId == horseId)
+            .OrderByDescending(s => s.TrainingDate)
+            .ThenByDescending(s => s.ScheduleId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<VaccinationSchedule>> GetVaccinationsForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.VaccinationSchedules
+            .AsNoTracking()
+            .Where(v => v.HorseId == horseId)
+            .OrderByDescending(v => v.DueDate)
+            .ThenByDescending(v => v.ScheduleId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MedicalRecord>> GetMedicalRecordsForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.MedicalRecords
+            .AsNoTracking()
+            .Where(r => r.HorseId == horseId)
+            .OrderByDescending(r => r.RecordDate)
+            .ThenByDescending(r => r.MedicalRecordId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TrainingLock>> GetTrainingLocksForHorseAsync(
+        int horseId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.TrainingLocks
+            .AsNoTracking()
+            .Where(l => l.HorseId == horseId)
+            .OrderByDescending(l => l.PlacedOn)
+            .ThenByDescending(l => l.LockId)
+            .ToListAsync(cancellationToken);
+    }
 }

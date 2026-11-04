@@ -13,20 +13,17 @@ public class HorseFitnessService : IHorseFitnessService
     private readonly IHorseHealthStatusRepository _horseHealthStatusRepository;
     private readonly ITrainingSessionRepository _trainingSessionRepository;
     private readonly TimeProvider _timeProvider;
-    private readonly IMedicalRepository _medicalRepository;
 
     public HorseFitnessService(
         IHorseRepository horseRepository,
         IHorseHealthStatusRepository horseHealthStatusRepository,
         ITrainingSessionRepository trainingSessionRepository,
-        TimeProvider timeProvider,
-        IMedicalRepository medicalRepository)
+        TimeProvider timeProvider)
     {
         _horseRepository = horseRepository;
         _horseHealthStatusRepository = horseHealthStatusRepository;
         _trainingSessionRepository = trainingSessionRepository;
         _timeProvider = timeProvider;
-        _medicalRepository = medicalRepository;
     }
 
     public async Task<HorseFitnessAssessmentDto?> GetAssessmentAsync(
@@ -61,14 +58,13 @@ public class HorseFitnessService : IHorseFitnessService
             DistanceKm = recentSessions.Sum(s => s.ActualDistanceKm ?? s.DistanceKm ?? 0),
         };
 
-        var activeLock = await _medicalRepository.GetActiveLockForHorseAsync(horseId, cancellationToken);
         var input = new FitnessInput
         {
             AgeYears = CalculateAge(horse.DateOfBirth, today),
             HealthStatus = health?.TrangThai,
-            // Đọc khóa y tế hiện hành; vẫn tôn trọng khóa cũ chưa được chuyển đổi.
-            IsTrainingLocked = activeLock is not null || horse.LockedAt.HasValue,
-            LockReason = activeLock?.LyDo ?? horse.LockReason,
+            // Lệnh "Khóa huấn luyện" của bác sĩ thú y được ghi vào Horse.LockedAt/LockReason.
+            IsTrainingLocked = horse.LockedAt.HasValue,
+            LockReason = horse.LockReason,
             RestingHeartRate = vitals?.HeartRate,
             RespiratoryRate = vitals?.RespiratoryRate,
             BodyTemperature = vitals?.BodyTemperature,

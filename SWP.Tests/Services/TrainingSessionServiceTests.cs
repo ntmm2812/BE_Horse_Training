@@ -169,7 +169,7 @@ public class TrainingSessionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_WhenVetLockedHorse_RecoveryWorkIsAlsoBlocked()
+    public async Task Create_WhenVetLockedHorse_OnlyRecoveryWorkIsAllowed()
     {
         _t.Db(db => TestData.LockHorse(db, _horseId, "Nghi viêm khớp"));
 
@@ -178,7 +178,7 @@ public class TrainingSessionServiceTests : IDisposable
 
         Assert.Equal(ServiceErrorCodes.HorseNotFit, trot.ErrorCode);
         Assert.Contains(trot.Details, d => d.Contains("Nghi viêm khớp"));
-        Assert.Equal(ServiceErrorCodes.HorseNotFit, walk.ErrorCode);
+        Assert.True(walk.Success, walk.ErrorMessage);
     }
 
     [Fact]

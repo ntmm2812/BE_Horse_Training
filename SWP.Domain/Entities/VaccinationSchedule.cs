@@ -1,20 +1,19 @@
-using System;
-
 namespace SWP.Domain.Models.Entity;
 
+/// <summary> Lịch tiêm phòng / tẩy giun. Trạng thái lưu chỉ là chờ tiêm hoặc đã tiêm. </summary>
 public class VaccinationSchedule
 {
     public int ScheduleId { get; set; }
 
     public int HorseId { get; set; }
 
-    public string Loai { get; set; } = null!;
+    public string VaccineType { get; set; } = null!;
 
-    public DateOnly NgayHen { get; set; }
+    public DateOnly DueDate { get; set; }
 
-    public string TrangThai { get; set; } = null!;
+    public string Status { get; set; } = null!;
 
-    public string? GhiChu { get; set; }
+    public DateTime CreatedAt { get; set; }
 
     public virtual Horse Horse { get; set; } = null!;
 }

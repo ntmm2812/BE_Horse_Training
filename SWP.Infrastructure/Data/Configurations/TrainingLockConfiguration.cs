@@ -8,15 +8,15 @@ public class TrainingLockConfiguration : IEntityTypeConfiguration<TrainingLock>
 {
     public void Configure(EntityTypeBuilder<TrainingLock> entity)
     {
-        entity.HasKey(e => e.LockId);
         entity.ToTable("TrainingLock");
-
-        entity.Property(e => e.LockId).HasColumnName("LockID");
+        entity.HasKey(e => e.LockId);
+        entity.Property(e => e.LockId).HasColumnName("LockID").ValueGeneratedOnAdd();
         entity.Property(e => e.HorseId).HasColumnName("HorseID");
         entity.Property(e => e.VetId).HasColumnName("VetID");
-        entity.Property(e => e.LyDo).HasMaxLength(200).IsRequired();
-        entity.Property(e => e.NgayDat).HasColumnType("date");
-        entity.Property(e => e.NgayGo).HasColumnType("date");
+        entity.Property(e => e.Reason).HasColumnName("LyDo").HasMaxLength(200);
+        entity.Property(e => e.PlacedOn).HasColumnName("NgayDat").HasColumnType("date");
+        entity.Property(e => e.ReleasedOn).HasColumnName("NgayGo").HasColumnType("date");
+        entity.Property(e => e.CreatedAt).HasColumnType("datetime");
 
         entity.HasOne(d => d.Horse)
             .WithMany(p => p.TrainingLocks)

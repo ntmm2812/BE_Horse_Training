@@ -31,6 +31,9 @@ public class OwnerHorseDetailDto
 
     public IReadOnlyList<OwnerRaceAchievementDto> ThanhTichThiDau { get; set; } =
         Array.Empty<OwnerRaceAchievementDto>();
+
+    public IReadOnlyList<OwnerHorseActivityDto> HoatDong { get; set; } =
+        Array.Empty<OwnerHorseActivityDto>();
 }
 
 public class OwnerDailyScheduleItemDto
@@ -47,4 +50,16 @@ public class OwnerRaceAchievementDto
     public string TenCuocDua { get; set; } = null!;
 
     public string TrangThai { get; set; } = null!;
+}
+
+public class OwnerHorseActivityDto
+{
+    public string Ngay { get; set; } = null!;
+
+    /// <summary>TapLuyen | ThiDau | TiemPhong | KhamBenh | KhoaTap</summary>
+    public string Loai { get; set; } = null!;
+
+    public string TieuDe { get; set; } = null!;
+
+    public string? ChiTiet { get; set; }
 }

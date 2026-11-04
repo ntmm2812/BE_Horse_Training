@@ -52,7 +52,7 @@ public class HorseFitnessServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task LegacyVeterinarianLock_BlocksAllTraining()
+    public async Task VeterinarianLock_AllowsOnlyRecoveryWork()
     {
         var horseId = _t.AddHorse("Locked", lockReason: "Bong gân cổ chân");
 
@@ -60,9 +60,8 @@ public class HorseFitnessServiceTests : IDisposable
 
         Assert.True(result!.IsTrainingLocked);
         Assert.Equal("Bong gân cổ chân", result.LockReason);
-        Assert.False(result.CanTrain);
-        Assert.Equal(FitnessReadiness.NotAllowed, result.Readiness);
-        Assert.Empty(result.AllowedTrainingTypes);
+        Assert.Equal(FitnessReadiness.RecoveryOnly, result.Readiness);
+        Assert.Equal([TrainingTypes.Walk, TrainingTypes.Swimming], result.AllowedTrainingTypes);
     }
 
     [Fact]
