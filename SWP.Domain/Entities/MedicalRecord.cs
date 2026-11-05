@@ -29,6 +29,8 @@ public class MedicalRecord
 
     public string? Notes { get; set; }
 
+    public string? ViTriChanThuong { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public int HorseId { get; set; }

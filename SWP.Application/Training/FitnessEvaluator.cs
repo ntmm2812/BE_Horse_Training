@@ -76,11 +76,13 @@ public static class FitnessEvaluator
         switch (input.HealthStatus?.Trim())
         {
             case HorseHealthStatuses.DuDieuKien:
+            case HorseHealthStatuses.Tot:
                 break;
             case HorseHealthStatuses.CachLy:
                 Limit(NotAllowedRank, "Ngựa đang cách ly – không được xếp lịch tập.");
                 break;
             case HorseHealthStatuses.ChanThuong:
+            case HorseHealthStatuses.DangDieuTri:
                 Limit(RecoveryRank, "Ngựa đang chấn thương – chỉ cho phép bài tập phục hồi.");
                 break;
             case HorseHealthStatuses.CanTheoDoi:
@@ -94,7 +96,7 @@ public static class FitnessEvaluator
         if (input.IsTrainingLocked)
         {
             var reason = string.IsNullOrWhiteSpace(input.LockReason) ? string.Empty : $" ({input.LockReason.Trim()})";
-            Limit(RecoveryRank, $"Bác sĩ thú y đã khóa huấn luyện{reason} – chỉ cho phép bài tập phục hồi.");
+            Limit(NotAllowedRank, $"Bác sĩ thú y đã khóa huấn luyện{reason} – không được tập cho đến khi mở khóa.");
         }
 
         if (input.BodyTemperature is { } temperature)

@@ -57,5 +57,9 @@ public class Horse
 
     public virtual ICollection<TrainingPlan> TrainingPlans { get; set; } = new List<TrainingPlan>();
 
+    public virtual ICollection<TrainingLock> TrainingLocks { get; set; } = new List<TrainingLock>();
+
+    public virtual ICollection<VaccinationSchedule> VaccinationSchedules { get; set; } = new List<VaccinationSchedule>();
+
     public virtual User User { get; set; } = null!;
 }

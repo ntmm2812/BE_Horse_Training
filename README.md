@@ -33,6 +33,11 @@ Yêu cầu .NET 8 SDK và SQL Server.
 
 ## Chạy test
 
+Test chạy trên .NET 8, cùng phiên bản chính với API. Kiểm tra `dotnet --list-runtimes`
+có `Microsoft.NETCore.App 8.0.x` và `Microsoft.AspNetCore.App 8.0.x`.
+Nếu máy chỉ có .NET 10, cài thêm .NET 8 SDK/ASP.NET Core Runtime; không bật
+`RollForward=Major` để chạy bộ test ASP.NET Core 8 bằng runtime 10.
+
 ```powershell
 dotnet test BE_Horse_managerment.sln
 ```
@@ -59,4 +64,38 @@ Mọi API dưới `api/trainer/*` yêu cầu JWT của vai trò `head_trainer`.
 
 Danh mục mã và nhãn tiếng Việt cho dropdown: `GET api/trainer/training-plans/options`. Lỗi trả về dạng `{ message, code, details }` với `code` ∈ `NOT_FOUND` (404), `VALIDATION_ERROR` (400), `INVALID_STATUS`/`CONFLICT` (409), `HORSE_NOT_FIT` (422).
 
-Schema bổ sung (bảng `TrainingPlanPhase`, các cột mới của `TrainingPlans`/`TrainingSchedule`) được tạo tự động khi khởi động API trên SQL Server – xem `SWP.Infrastructure/Data/TrainingSchemaUpdater.cs`.
+API không tự tạo/sửa bảng hoặc seed dữ liệu khi khởi động. Database cần được chuẩn bị
+trước khi chạy các luồng nghiệp vụ. Các phần bổ sung schema được định nghĩa trong
+`SWP.Infrastructure/Data/TrainingSchemaUpdater.cs`, `MedicalSchemaUpdater.cs` và
+`Data/Sql/InjuryWorkflow.sql`; chỉ áp dụng có chủ đích trên database đã được sao lưu.
+
+Medical, training và injury dùng chung `ApplicationDbContext` để giữ liên kết bệnh án,
+khóa tập và hồ sơ chấn thương. `OriginalCareDbContext` chỉ phục vụ API chăm sóc hằng ngày
+trên các cột gốc; không dùng context này thay cho service y tế vì sẽ mất thông tin liên kết
+và điều kiện tái khám khi mở khóa.
+
+## Luồng Groom và phối hợp với bác sĩ
+
+Các API `/api/care/*` yêu cầu JWT role `groom`. ID nhân viên lấy từ tài khoản đăng nhập;
+tham số `groomId` chỉ được dùng để xem dữ liệu của chính mình.
+
+| API | Chức năng |
+| --- | --- |
+| `GET /api/care/tasks` | Công việc hằng ngày được giao, loại trừ công việc `Medical` |
+| `POST /api/care/tasks/{taskId}/complete` | Xác nhận việc của mình; trả 409 nếu là việc y tế hoặc đã hoàn thành |
+| `GET /api/care/stable-assignments`, `GET /api/care/stable-numbers` | Phân chuồng và lịch chăm sóc hằng ngày |
+| `GET /api/care/feeding-plans` | Khẩu phần đang áp dụng, giữ chi tiết thức ăn và đơn vị |
+| `GET /api/care/supplies` | Vật tư và số lượng tồn kho |
+| `POST /api/care/incident-reports` | Gửi sự cố, lưu người báo cáo theo JWT vào `AuditLog` |
+| `GET /api/care/incident-reports` | Các sự cố do chính Groom gửi |
+| `GET /api/medical/incident-reports?horseId=...` | Bác sĩ đọc báo cáo của Groom; `horseId` là bộ lọc tùy chọn |
+
+Báo cáo sự cố không tự tạo bệnh án, hồ sơ chấn thương hoặc khóa tập. Bác sĩ xem báo cáo
+và sử dụng luồng medical/injury để đánh giá, lập hồ sơ và giao việc khi cần.
+
+Công việc y tế do bác sĩ giao có `TaskType = Medical` và đi qua
+`/api/injury-cases/care-tasks`: Groom bắt đầu việc (`/{id}/start`), rồi ghi kết quả
+(`/{id}/complete`) hoặc lý do không thực hiện được (`/{id}/unable`), gửi `Version`
+và `Notes` theo request của luồng này. API care hằng ngày không được dùng để hoàn thành
+việc y tế, kể cả khi công việc đang `InProgress`; trạng thái, phiên bản và lịch sử
+hồ sơ chấn thương được cập nhật trong luồng injury.

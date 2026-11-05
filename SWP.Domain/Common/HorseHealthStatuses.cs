@@ -4,7 +4,11 @@ public static class HorseHealthStatuses
 {
     public const string DuDieuKien = "Đủ điều kiện";
 
+    public const string Tot = "Tốt";
+
     public const string CanTheoDoi = "Cần theo dõi";
+
+    public const string DangDieuTri = "Đang điều trị";
 
     public const string ChanThuong = "Chấn thương";
 
@@ -13,7 +17,9 @@ public static class HorseHealthStatuses
     public static readonly string[] All =
     [
         DuDieuKien,
+        Tot,
         CanTheoDoi,
+        DangDieuTri,
         ChanThuong,
         CachLy,
     ];
