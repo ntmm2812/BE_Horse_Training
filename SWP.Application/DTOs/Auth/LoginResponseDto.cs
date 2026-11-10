@@ -18,4 +18,11 @@ public class AuthUserDto
     public string RoleId { get; set; } = null!;
 
     public string Status { get; set; } = null!;
+
+    public bool MustChangePassword { get; set; }
+}
+
+public class ChangePasswordRequestDto
+{
+    public string NewPassword { get; set; } = null!;
 }

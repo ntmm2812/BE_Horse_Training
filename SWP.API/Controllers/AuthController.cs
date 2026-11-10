@@ -1,3 +1,6 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SWP.Application.DTOs.Auth;
 using SWP.Application.Services.Interface;
@@ -56,5 +59,32 @@ public class AuthController : ControllerBase
         }
 
         return StatusCode(StatusCodes.Status201Created, result.Data);
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(sub) || !int.TryParse(sub, out var userId))
+        {
+            return Unauthorized(new { message = "Không xác định được tài khoản đăng nhập." });
+        }
+
+        var result = await _authService.ChangePasswordAsync(userId, request, cancellationToken);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == "NOT_FOUND")
+            {
+                return NotFound(new { message = result.ErrorMessage, code = result.ErrorCode });
+            }
+
+            return BadRequest(new { message = result.ErrorMessage, code = result.ErrorCode });
+        }
+
+        return Ok(result.Data);
     }
 }

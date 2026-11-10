@@ -30,6 +30,16 @@ public class UserRepository : IUserRepository
             .AnyAsync(u => u.Email.ToLower() == email, cancellationToken);
     }
 
+    public async Task<bool> EmailExistsExceptAsync(
+        string email,
+        int exceptUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .AnyAsync(u => u.UserId != exceptUserId && u.Email.ToLower() == email, cancellationToken);
+    }
+
     public async Task<int?> GetRoleIdByRoleNameAsync(string roleName, CancellationToken cancellationToken = default)
     {
         if (RoleMapper.TryMapToCanonicalRoleId(roleName, out var canonical))
@@ -95,6 +105,14 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
     }
 
+    public async Task<User?> GetByIdWithRoleReadAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+    }
+
     public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
     {
         _context.Users.Update(user);
@@ -115,6 +133,27 @@ public class UserRepository : IUserRepository
         return users
             .Where(u => RoleMapper.TryMapToCanonicalRoleId(u.Role.RoleName, out var mapped)
                         && string.Equals(mapped, target, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(u => u.FullName)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<User>> GetStaffUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .ToListAsync(cancellationToken);
+
+        return users
+            .Where(u =>
+            {
+                if (!RoleMapper.TryMapToCanonicalRoleId(u.Role.RoleName, out var mapped))
+                {
+                    return false;
+                }
+
+                return mapped is RoleNames.HeadTrainer or RoleNames.Veterinarian or RoleNames.Groom;
+            })
             .OrderBy(u => u.FullName)
             .ToList();
     }

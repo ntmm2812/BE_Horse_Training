@@ -8,6 +8,8 @@ public interface IUserRepository
 
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
+    Task<bool> EmailExistsExceptAsync(string email, int exceptUserId, CancellationToken cancellationToken = default);
+
     Task<int?> GetRoleIdByRoleNameAsync(string roleName, CancellationToken cancellationToken = default);
 
     Task<int?> GetRoleIdByCanonicalRoleIdAsync(string canonicalRoleId, CancellationToken cancellationToken = default);
@@ -18,9 +20,14 @@ public interface IUserRepository
 
     Task<User?> GetByIdWithRoleAsync(int userId, CancellationToken cancellationToken = default);
 
+    Task<User?> GetByIdWithRoleReadAsync(int userId, CancellationToken cancellationToken = default);
+
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<User>> GetActiveUsersByCanonicalRoleAsync(
         string canonicalRoleId,
         CancellationToken cancellationToken = default);
+
+    /// <summary> Nhân sự nội bộ (HLV / vet / groom), mọi trạng thái Active/Inactive. </summary>
+    Task<IReadOnlyList<User>> GetStaffUsersAsync(CancellationToken cancellationToken = default);
 }

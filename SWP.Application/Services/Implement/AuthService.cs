@@ -51,6 +51,11 @@ public class AuthService : IAuthService
             return LoginResult.Fail("Tài khoản đang chờ Quản lý CLB duyệt.", "PENDING_APPROVAL");
         }
 
+        if (string.Equals(user.Status, UserStatuses.Inactive, StringComparison.OrdinalIgnoreCase))
+        {
+            return LoginResult.Fail("Tài khoản đã bị khóa, liên hệ Quản lý CLB.", "ACCOUNT_LOCKED");
+        }
+
         if (!string.Equals(user.Status, UserStatuses.Active, StringComparison.OrdinalIgnoreCase))
         {
             return LoginResult.Fail("Tài khoản không được phép đăng nhập.");
@@ -67,10 +72,53 @@ public class AuthService : IAuthService
                 Email = user.Email,
                 RoleId = RoleMapper.ToRoleId(user.Role.RoleName),
                 Status = user.Status,
+                MustChangePassword = user.MustChangePassword,
             },
         };
 
         return LoginResult.Ok(response);
+    }
+
+    public async Task<LoginResult> ChangePasswordAsync(
+        int userId,
+        ChangePasswordRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < MinPasswordLength)
+        {
+            return LoginResult.Fail($"Mật khẩu phải có ít nhất {MinPasswordLength} ký tự.");
+        }
+
+        var user = await _userRepository.GetByIdWithRoleAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            return LoginResult.Fail("Không tìm thấy tài khoản.", "NOT_FOUND");
+        }
+
+        if (!string.Equals(user.Status, UserStatuses.Active, StringComparison.OrdinalIgnoreCase))
+        {
+            return LoginResult.Fail("Tài khoản không được phép đổi mật khẩu.");
+        }
+
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        user.MustChangePassword = false;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        var token = _jwtTokenGenerator.GenerateToken(user);
+        return LoginResult.Ok(new LoginResponseDto
+        {
+            Token = token,
+            User = new AuthUserDto
+            {
+                UserId = user.UserId,
+                FullName = user.FullName,
+                Email = user.Email,
+                RoleId = RoleMapper.ToRoleId(user.Role.RoleName),
+                Status = user.Status,
+                MustChangePassword = false,
+            },
+        });
     }
 
     public async Task<RegisterResult> RegisterAsync(RegisterRequestDto request, CancellationToken cancellationToken = default)
@@ -114,6 +162,7 @@ public class AuthService : IAuthService
             Email = normalizedEmail,
             PasswordHash = _passwordHasher.Hash(request.Password),
             Status = UserStatuses.Pending,
+            MustChangePassword = false,
             RoleId = roleId.Value,
             CreatedAt = DateTime.UtcNow,
         };
