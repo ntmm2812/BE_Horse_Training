@@ -260,6 +260,89 @@ public class TrainingSessionService : ITrainingSessionService
         return ServiceResult<TrainingSessionDto>.Ok(TrainingMapper.ToSessionDto(session, session.Plan));
     }
 
+    public async Task<ServiceResult<SessionReportDto>> SubmitReportAsync(
+        int sessionId,
+        int groomId,
+        SubmitSessionReportRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetForUpdateAsync(sessionId, cancellationToken);
+        if (session is null)
+        {
+            return ServiceResult<SessionReportDto>.NotFound(SessionNotFound);
+        }
+
+        if (session.AssignedToUserId != groomId)
+        {
+            return ServiceResult<SessionReportDto>.Fail(
+                ServiceErrorCodes.Conflict,
+                "Bạn chỉ được báo cáo buổi tập được phân công cho mình.");
+        }
+
+        if (TrainingSessionStatuses.Is(session.Status, TrainingSessionStatuses.Cancelled))
+        {
+            return ServiceResult<SessionReportDto>.Fail(ServiceErrorCodes.InvalidStatus, "Buổi tập đã hủy.");
+        }
+
+        if (session.Report is not null)
+        {
+            return ServiceResult<SessionReportDto>.Fail(ServiceErrorCodes.Conflict, "Buổi tập này đã có báo cáo.");
+        }
+
+        var startsAt = session.TrainingDate.Date + (session.StartTime?.TimeOfDay ?? TimeSpan.Zero);
+        if (startsAt > LocalNow)
+        {
+            return ServiceResult<SessionReportDto>.Fail(
+                ServiceErrorCodes.InvalidStatus,
+                "Chưa đến giờ tập, chưa thể báo cáo buổi này.");
+        }
+
+        if (!TrainingReportOptions.TryNormalizeResult(request.Result, out var result))
+        {
+            return ServiceResult<SessionReportDto>.Invalid("Vui lòng chọn kết quả buổi tập.");
+        }
+
+        if (!TrainingReportOptions.TryNormalizeReaction(request.HorseReaction, out var reaction))
+        {
+            return ServiceResult<SessionReportDto>.Invalid("Vui lòng chọn phản ứng của ngựa.");
+        }
+
+        var note = (request.Note ?? string.Empty).Trim();
+        if (note.Length > TrainingReportOptions.MaxNoteLength)
+        {
+            return ServiceResult<SessionReportDto>.Invalid(
+                $"Ghi chú tối đa {TrainingReportOptions.MaxNoteLength} ký tự.");
+        }
+
+        if (request.ActualDistanceKm is { } km)
+        {
+            if (result == TrainingReportOptions.NotTrained)
+            {
+                return ServiceResult<SessionReportDto>.Invalid("Buổi không tập thì không có quãng đường thực tế.");
+            }
+
+            if (km < 0 || km > TrainingReportOptions.MaxDistanceKm)
+            {
+                return ServiceResult<SessionReportDto>.Invalid(
+                    $"Quãng đường thực tế từ 0 đến {TrainingReportOptions.MaxDistanceKm} km.");
+            }
+        }
+
+        session.Report = new TrainingSessionReport
+        {
+            Result = result,
+            ActualDistanceKm = request.ActualDistanceKm,
+            HorseReaction = reaction,
+            Note = note,
+            ReportedByUserId = groomId,
+            ReportedByUser = session.AssignedToUser!,
+            ReportedAt = _timeProvider.GetUtcNow().UtcDateTime,
+        };
+
+        await _sessionRepository.SaveChangesAsync(cancellationToken);
+        return ServiceResult<SessionReportDto>.Ok(TrainingMapper.ToReportDto(session.Report)!);
+    }
+
     public async Task<ServiceResult<TrainingSessionDto>> CancelAsync(
         int sessionId,
         CancelTrainingSessionRequestDto request,

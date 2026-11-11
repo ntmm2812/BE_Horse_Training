@@ -58,4 +58,6 @@ public class TrainingSchedule
     public virtual TrainingPlan Plan { get; set; } = null!;
 
     public virtual TrainingPlanPhase? Phase { get; set; }
+
+    public virtual TrainingSessionReport? Report { get; set; }
 }

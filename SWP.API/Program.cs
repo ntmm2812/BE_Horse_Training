@@ -162,6 +162,7 @@ namespace SWP.API
                     RaceSchemaUpdater.Apply(db);
                     UserSchemaUpdater.Apply(db);
                     ApprovalSchemaUpdater.Apply(db);
+                    TrainingReportSchemaUpdater.Apply(db);
                 }
             }
 

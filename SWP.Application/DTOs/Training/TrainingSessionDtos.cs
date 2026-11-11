@@ -65,6 +65,9 @@ public class TrainingSessionDto
     public string? TrialVideoUrl { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary> Báo cáo của nhân viên chăm sóc; null nếu chưa có. </summary>
+    public SessionReportDto? Report { get; set; }
 }
 
 public class TrainingSessionQueryDto
