@@ -7,7 +7,7 @@ using SWP.Domain.Common;
 
 namespace SWP.API.Realtime;
 
-[Authorize(Roles = RoleNames.HorseOwner + "," + RoleNames.HeadTrainer + "," + RoleNames.ClubManager + "," + RoleNames.Groom)]
+[Authorize(Roles = RoleNames.HorseOwner + "," + RoleNames.HeadTrainer + "," + RoleNames.ClubManager + "," + RoleNames.Groom + "," + RoleNames.Veterinarian)]
 public class HorseActivityHub : Hub
 {
     public override async Task OnConnectedAsync()

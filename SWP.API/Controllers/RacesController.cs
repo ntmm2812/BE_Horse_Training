@@ -70,7 +70,7 @@ public class RacesController : ControllerBase
     }
 
     [HttpPut("{raceId:int}/registrations/{horseId:int}/result")]
-    [Authorize(Roles = RoleNames.HeadTrainer)]
+    [Authorize(Roles = RoleNames.HeadTrainer + "," + RoleNames.ClubManager)]
     public async Task<IActionResult> UpdateResult(
         int raceId,
         int horseId,
@@ -88,7 +88,7 @@ public class RacesController : ControllerBase
     }
 
     [HttpPut("{raceId:int}/registrations/{horseId:int}/prize")]
-    [Authorize(Roles = RoleNames.ClubManager)]
+    [Authorize(Roles = RoleNames.HeadTrainer + "," + RoleNames.ClubManager)]
     public async Task<IActionResult> SetPrize(
         int raceId,
         int horseId,
