@@ -86,9 +86,11 @@ public class TrainerTrainingPlansController : TrainingControllerBase
     }
 
     [HttpPost("{planId:int}/activate")]
-    public async Task<IActionResult> Activate(int planId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Activate(int planId,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ActivateTrainingPlanRequestDto? request,
+        CancellationToken cancellationToken)
     {
-        var result = await _trainingPlanService.ActivateAsync(planId, cancellationToken);
+        var result = await _trainingPlanService.ActivateAsync(planId, cancellationToken, request?.AssignedToUserId);
         return await FromPlanResultNotify(result, StatusCodes.Status200OK, cancellationToken);
     }
 

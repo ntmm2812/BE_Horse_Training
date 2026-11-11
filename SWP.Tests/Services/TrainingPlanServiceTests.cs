@@ -232,6 +232,7 @@ public class TrainingPlanServiceTests : IDisposable
     {
         var horseId = _t.AddHorse("Thunder");
         var created = await _t.PlanService().CreateAsync(TestData.ThreePhasePlan(horseId), _t.Ids.TrainerId);
+        await _t.ApprovePlanAsync(created.Data!.PlanId);
 
         var result = await _t.PlanService().ActivateAsync(created.Data!.PlanId);
 

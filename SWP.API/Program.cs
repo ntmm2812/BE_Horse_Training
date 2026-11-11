@@ -129,6 +129,7 @@ namespace SWP.API
 
             using (var scope = app.Services.CreateScope())
             {
+                LocalDemoSeeder.Initialize(scope.ServiceProvider, app.Configuration, app.Environment);
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 // Script T-SQL chỉ chạy trên SQL Server (test tích hợp dùng SQLite in-memory).
                 if (db.Database.IsSqlServer())
@@ -160,6 +161,7 @@ namespace SWP.API
                     CareSchemaUpdater.Apply(db);
                     RaceSchemaUpdater.Apply(db);
                     UserSchemaUpdater.Apply(db);
+                    ApprovalSchemaUpdater.Apply(db);
                 }
             }
 
@@ -177,6 +179,15 @@ namespace SWP.API
             app.UseCors("Frontend");
             app.UseAuthentication();
             app.UseAuthorization();
+            app.Use(async (context, next) =>
+            {
+                try { await next(); }
+                catch (DbUpdateConcurrencyException)
+                {
+                    context.Response.StatusCode = 409;
+                    await context.Response.WriteAsJsonAsync(new { message = "Dữ liệu đã thay đổi. Vui lòng tải lại trước khi thực hiện.", code = "CONFLICT" });
+                }
+            });
             app.MapControllers();
             app.MapHub<SWP.API.Realtime.HorseActivityHub>("/hubs/horse-activity");
 

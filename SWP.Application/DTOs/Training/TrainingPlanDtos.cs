@@ -26,6 +26,10 @@ public class TrainingPlanDto
 
     public int? CreatedByUserId { get; set; }
 
+    public int? DefaultAssignedToUserId { get; set; }
+
+    public string? DefaultAssignedToName { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }

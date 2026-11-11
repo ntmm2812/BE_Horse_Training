@@ -27,9 +27,21 @@ public class TrainingPlan
 
     public DateTime? UpdatedAt { get; set; }
 
+    public string ApprovalStatus { get; set; } = "Draft";
+    public string ApprovalNote { get; set; } = "";
+    public DateTime? SentAt { get; set; }
+    public DateTime? DecidedAt { get; set; }
+    public bool OwnerSeen { get; set; } = true;
+    public bool TrainerSeen { get; set; } = true;
+    public string ApprovalVersion { get; set; } = Guid.NewGuid().ToString();
+
     public int HorseId { get; set; }
 
     public int? CreatedByUserId { get; set; }
+
+    public int? DefaultAssignedToUserId { get; set; }
+
+    public virtual User? DefaultAssignedToUser { get; set; }
 
     public virtual Horse Horse { get; set; } = null!;
 

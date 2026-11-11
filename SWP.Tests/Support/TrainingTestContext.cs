@@ -72,6 +72,17 @@ public sealed class TrainingTestContext : IDisposable
 
     public RaceService RaceService() => new(new RaceRepository(NewContext()), Clock);
 
+    public async Task ApprovePlanAsync(int planId)
+    {
+        var db = NewContext();
+        var approvals = new OwnerApprovalService(db, new RaceService(new RaceRepository(db), Clock), Clock);
+        Assert.True((await approvals.SendPlan(planId, default)).Success);
+        var version = db.TrainingPlans.Single(p => p.PlanId == planId).ApprovalVersion;
+        var result = await approvals.DecidePlan(planId, Ids.OwnerId,
+            new SWP.Application.DTOs.Approvals.PlanDecisionRequest("Approved", "", version), default);
+        Assert.True(result.Success, result.ErrorMessage);
+    }
+
     public TrainingPlanService PlanService()
     {
         var db = NewContext();
@@ -101,6 +112,7 @@ public sealed class TrainingTestContext : IDisposable
     {
         var created = await PlanService().CreateAsync(TestData.ThreePhasePlan(horseId), Ids.TrainerId);
         Assert.True(created.Success, created.ErrorMessage);
+        await ApprovePlanAsync(created.Data!.PlanId);
         var activated = await PlanService().ActivateAsync(created.Data!.PlanId);
         Assert.True(activated.Success, activated.ErrorMessage);
         return created.Data.PlanId;

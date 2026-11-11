@@ -240,6 +240,24 @@ public class TrainingPlanService : ITrainingPlanService
         plan.Notes = TrainingValidation.NormalizeOptional(request.Notes);
         plan.UpdatedAt = UtcNow;
 
+        // Any edited plan that was already submitted needs a fresh owner decision.
+        if (plan.ApprovalStatus is OwnerApprovalStatuses.PendingOwner or OwnerApprovalStatuses.Approved)
+        {
+            plan.ApprovalStatus = OwnerApprovalStatuses.PendingOwner;
+            plan.ApprovalNote = "";
+            plan.SentAt = UtcNow;
+            plan.DecidedAt = null;
+            plan.OwnerSeen = false;
+        }
+        else if (plan.ApprovalStatus == OwnerApprovalStatuses.Rejected)
+        {
+            plan.ApprovalStatus = OwnerApprovalStatuses.Draft;
+            plan.ApprovalNote = "";
+            plan.SentAt = null;
+            plan.DecidedAt = null;
+        }
+        plan.ApprovalVersion = Guid.NewGuid().ToString();
+
         await _planRepository.SaveChangesAsync(cancellationToken);
         return await GetDetailAsync(planId, cancellationToken);
     }
@@ -265,7 +283,8 @@ public class TrainingPlanService : ITrainingPlanService
 
     public async Task<ServiceResult<TrainingPlanDetailDto>> ActivateAsync(
         int planId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? assignedToUserId = null)
     {
         var plan = await _planRepository.GetForUpdateAsync(planId, cancellationToken);
         if (plan is null)
@@ -312,6 +331,15 @@ public class TrainingPlanService : ITrainingPlanService
                 fitness.Warnings);
         }
 
+        if (plan.ApprovalStatus != OwnerApprovalStatuses.Approved)
+            return ServiceResult<TrainingPlanDetailDto>.Fail(ServiceErrorCodes.InvalidStatus, "Cần chủ ngựa đồng ý trước khi áp dụng giáo án.");
+
+        var (assignmentError, groom) = await TrainingValidation.ValidateAssigneeAsync(_userRepository, assignedToUserId, cancellationToken);
+        if (assignmentError is not null) return ServiceResult<TrainingPlanDetailDto>.Invalid(assignmentError);
+        if (groom is not null && RoleMapper.ToRoleId(groom.Role.RoleName) != RoleNames.Groom)
+            return ServiceResult<TrainingPlanDetailDto>.Invalid("Vui lòng chọn Nhân viên chăm sóc cho giáo án.");
+        plan.DefaultAssignedToUserId = groom?.UserId;
+        plan.DefaultAssignedToUser = groom;
         plan.PlanStatus = TrainingPlanStatuses.Active;
         plan.UpdatedAt = UtcNow;
         await _planRepository.SaveChangesAsync(cancellationToken);
@@ -351,6 +379,8 @@ public class TrainingPlanService : ITrainingPlanService
 
         var isActive = TrainingPlanStatuses.Is(plan.PlanStatus, TrainingPlanStatuses.Active);
         var isDraft = TrainingPlanStatuses.Is(plan.PlanStatus, TrainingPlanStatuses.Draft);
+        if (!request.PreviewOnly && plan.ApprovalStatus != OwnerApprovalStatuses.Approved)
+            return ServiceResult<WeeklyScheduleGenerationResultDto>.Fail(ServiceErrorCodes.InvalidStatus, "Cần chủ ngựa đồng ý trước khi giao lịch.");
         if (!isActive && !(request.PreviewOnly && isDraft))
         {
             return ServiceResult<WeeklyScheduleGenerationResultDto>.Fail(
@@ -369,7 +399,7 @@ public class TrainingPlanService : ITrainingPlanService
         }
 
         var (assigneeError, assignee) = await TrainingValidation.ValidateAssigneeAsync(
-            _userRepository, request.AssignedToUserId, cancellationToken);
+            _userRepository, request.AssignedToUserId ?? (request.UsePlanAssignee ? plan.DefaultAssignedToUserId : null), cancellationToken);
         if (assigneeError is not null)
         {
             return ServiceResult<WeeklyScheduleGenerationResultDto>.Invalid(assigneeError);

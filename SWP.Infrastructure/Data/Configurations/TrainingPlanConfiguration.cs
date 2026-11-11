@@ -27,6 +27,12 @@ public class TrainingPlanConfiguration : IEntityTypeConfiguration<TrainingPlan>
             .IsUnicode(false);
         entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
         entity.Property(e => e.CreatedByUserId).HasColumnName("CreatedByUserID");
+        entity.Property(e => e.ApprovalStatus).HasMaxLength(30);
+        entity.Property(e => e.ApprovalNote).HasMaxLength(300);
+        entity.Property(e => e.ApprovalVersion).HasMaxLength(36).IsConcurrencyToken();
+        entity.HasOne(e => e.DefaultAssignedToUser).WithMany()
+            .HasForeignKey(e => e.DefaultAssignedToUserId).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_TrainingPlans_DefaultAssignee");
 
         entity.HasOne(d => d.Horse).WithMany(p => p.TrainingPlans)
             .HasForeignKey(d => d.HorseId)

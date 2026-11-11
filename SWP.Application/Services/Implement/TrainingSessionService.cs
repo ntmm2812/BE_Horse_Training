@@ -166,6 +166,8 @@ public class TrainingSessionService : ITrainingSessionService
             return ServiceResult<TrainingSessionDto>.Invalid(assigneeError);
         }
 
+        if (assignee is not null && session.Plan.ApprovalStatus != OwnerApprovalStatuses.Approved)
+            return ServiceResult<TrainingSessionDto>.Fail(ServiceErrorCodes.InvalidStatus, "Cần chủ ngựa đồng ý trước khi giao lịch.");
         session.AssignedToUserId = assignee?.UserId;
         session.AssignedToUser = assignee;
         await _sessionRepository.SaveChangesAsync(cancellationToken);
@@ -195,6 +197,9 @@ public class TrainingSessionService : ITrainingSessionService
                 ServiceErrorCodes.InvalidStatus,
                 "Giáo án của buổi tập không còn được áp dụng.");
         }
+
+        if (session.Plan.ApprovalStatus != OwnerApprovalStatuses.Approved)
+            return ServiceResult<TrainingSessionDto>.Fail(ServiceErrorCodes.InvalidStatus, "Cần chủ ngựa đồng ý trước khi bắt đầu tập.");
 
         if (DateOnly.FromDateTime(session.TrainingDate) != Today)
         {
@@ -411,6 +416,8 @@ public class TrainingSessionService : ITrainingSessionService
         int? excludeSessionId,
         CancellationToken cancellationToken)
     {
+        if (plan.ApprovalStatus != OwnerApprovalStatuses.Approved)
+            return ServiceResult<ValidatedSession>.Fail(ServiceErrorCodes.InvalidStatus, "Cần chủ ngựa đồng ý trước khi xếp lịch.");
         if (!TrainingPlanStatuses.Is(plan.PlanStatus, TrainingPlanStatuses.Active))
         {
             return ServiceResult<ValidatedSession>.Fail(
@@ -505,7 +512,7 @@ public class TrainingSessionService : ITrainingSessionService
         }
 
         var (assigneeError, assignee) = await TrainingValidation.ValidateAssigneeAsync(
-            _userRepository, request.AssignedToUserId, cancellationToken);
+            _userRepository, request.AssignedToUserId ?? (excludeSessionId is null && request.UsePlanAssignee ? plan.DefaultAssignedToUserId : null), cancellationToken);
         if (assigneeError is not null)
         {
             return ServiceResult<ValidatedSession>.Invalid(assigneeError);

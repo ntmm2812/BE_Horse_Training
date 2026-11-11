@@ -36,6 +36,11 @@ public class HorseRealtimeNotifier : IHorseRealtimeNotifier
     {
         try
         {
+            if (kind == HorseRealtimeKinds.TapLuyen)
+                await _hub.Clients.Group("training-grooms")
+                    .SendAsync(HorseRealtimeEvents.HorseChanged, new { horseId, kind }, cancellationToken);
+            await _hub.Clients.Group("approval-staff")
+                .SendAsync(HorseRealtimeEvents.HorseChanged, new { horseId, kind }, cancellationToken);
             await _hub.Clients
                 .Group(HorseRealtimeGroups.Owner(ownerUserId))
                 .SendAsync(

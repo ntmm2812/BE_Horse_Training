@@ -32,7 +32,7 @@ public interface ITrainingPlanService
 
     Task<ServiceResult<bool>> DeleteAsync(int planId, CancellationToken cancellationToken = default);
 
-    Task<ServiceResult<TrainingPlanDetailDto>> ActivateAsync(int planId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<TrainingPlanDetailDto>> ActivateAsync(int planId, CancellationToken cancellationToken = default, int? assignedToUserId = null);
 
     Task<ServiceResult<TrainingPlanDetailDto>> CompleteAsync(int planId, CancellationToken cancellationToken = default);
 

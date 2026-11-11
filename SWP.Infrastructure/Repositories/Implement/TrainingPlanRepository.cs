@@ -23,6 +23,7 @@ public class TrainingPlanRepository : ITrainingPlanRepository
         var query = _context.TrainingPlans
             .AsNoTracking()
             .Include(p => p.Horse)
+            .Include(p => p.DefaultAssignedToUser)
             .Include(p => p.Phases)
             .Include(p => p.TrainingSchedules)
             .AsQueryable();
@@ -48,6 +49,7 @@ public class TrainingPlanRepository : ITrainingPlanRepository
         return await _context.TrainingPlans
             .AsNoTracking()
             .Include(p => p.Horse)
+            .Include(p => p.DefaultAssignedToUser)
             .Include(p => p.Phases)
             .Include(p => p.TrainingSchedules).ThenInclude(s => s.AssignedToUser)
             .FirstOrDefaultAsync(p => p.PlanId == planId, cancellationToken);
@@ -57,6 +59,7 @@ public class TrainingPlanRepository : ITrainingPlanRepository
     {
         return await _context.TrainingPlans
             .Include(p => p.Horse)
+            .Include(p => p.DefaultAssignedToUser)
             .Include(p => p.Phases)
             .FirstOrDefaultAsync(p => p.PlanId == planId, cancellationToken);
     }

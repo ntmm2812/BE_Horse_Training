@@ -86,6 +86,7 @@ public class TrainingSessionQueryDto
 
 public class SaveTrainingSessionRequestDto
 {
+    public bool UsePlanAssignee { get; set; } = true;
     public DateOnly TrainingDate { get; set; }
 
     /// <summary> "HH:mm"; mặc định 06:00. </summary>

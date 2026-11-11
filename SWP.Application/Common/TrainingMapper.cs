@@ -214,6 +214,8 @@ public static class TrainingMapper
         dto.EndDate = plan.EndDate;
         dto.Notes = plan.Notes;
         dto.CreatedByUserId = plan.CreatedByUserId;
+        dto.DefaultAssignedToUserId = plan.DefaultAssignedToUserId;
+        dto.DefaultAssignedToName = plan.DefaultAssignedToUser?.FullName;
         dto.CreatedAt = plan.CreatedAt;
         dto.UpdatedAt = plan.UpdatedAt;
         dto.PhaseCount = plan.Phases.Count;

@@ -102,7 +102,17 @@ public class RaceRepository : IRaceRepository
 
     public void AddRegistration(RaceRegistration registration) => _db.RaceRegistrations.Add(registration);
 
-    public void RemoveRegistration(RaceRegistration registration) => _db.RaceRegistrations.Remove(registration);
+    public void RemoveRegistration(RaceRegistration registration)
+    {
+        // Keep the approval list consistent when an already-approved race entry is cancelled.
+        foreach (var proposal in _db.RaceApprovals.Where(r => r.RaceId == registration.RaceId
+                     && r.HorseId == registration.HorseId && r.Status == "Approved"))
+        {
+            proposal.Status = "Withdrawn";
+            proposal.Version = Guid.NewGuid().ToString();
+        }
+        _db.RaceRegistrations.Remove(registration);
+    }
 
     public Task SaveAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);

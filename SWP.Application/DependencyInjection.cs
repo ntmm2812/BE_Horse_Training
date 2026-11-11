@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IVeterinaryService, VeterinaryService>();
         services.AddScoped<ICareService, CareService>();
         services.AddScoped<IRaceService, RaceService>();
+        services.AddScoped<OwnerApprovalService>();
         services.TryAddScoped<IHorseRealtimeNotifier, NullHorseRealtimeNotifier>();
         services.TryAddSingleton(TimeProvider.System);
         return services;

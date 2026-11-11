@@ -276,6 +276,9 @@ public class RaceService : IRaceService
         TenGiai = race.RaceName,
         Ngay = race.RaceDate is DateTime date ? DateText(date) : string.Empty,
         DiaDiem = race.Location ?? string.Empty,
+        RegistrationDeadline = race.RegistrationDeadline is DateTime deadline ? DateText(deadline) : null,
+        EntryFee = race.EntryFee,
+        Status = race.Status,
     };
 
     private RaceRegistrationDto MapRegistration(RaceRegistration registration) => new()

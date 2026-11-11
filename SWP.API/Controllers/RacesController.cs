@@ -48,24 +48,11 @@ public class RacesController : ControllerBase
 
     [HttpPost("{raceId:int}/registrations")]
     [Authorize(Roles = RoleNames.HeadTrainer)]
-    public async Task<IActionResult> Register(
+    public IActionResult Register(
         int raceId,
-        [FromBody] RegisterRaceRequestDto request,
-        CancellationToken cancellationToken)
+        [FromBody] RegisterRaceRequestDto request)
     {
-        if (!TryGetCurrentUserId(out var userId))
-        {
-            return UnknownUser();
-        }
-
-        var result = await _races.RegisterAsync(raceId, request.HorseID, userId, cancellationToken);
-        if (!result.Success)
-        {
-            return Error(result);
-        }
-
-        await _realtime.NotifyHorseChangedAsync(request.HorseID, HorseRealtimeKinds.ThiDau, cancellationToken);
-        return Ok(result.Data);
+        return Conflict(new { message = "Hãy tạo đăng ký thi đấu và gửi chủ ngựa, quản lý duyệt trước khi ghi danh.", code = "APPROVAL_REQUIRED" });
     }
 
     [HttpDelete("{raceId:int}/registrations/{horseId:int}")]

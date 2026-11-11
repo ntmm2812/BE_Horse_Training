@@ -37,6 +37,8 @@ public class ApplicationDbContext : DbContext
 
     public virtual DbSet<RaceRegistration> RaceRegistrations { get; set; }
 
+    public virtual DbSet<RaceApproval> RaceApprovals { get; set; }
+
     public virtual DbSet<Role> Roles { get; set; }
 
     public virtual DbSet<RolePermission> RolePermissions { get; set; }
