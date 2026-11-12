@@ -8,4 +8,7 @@ public static class UserStatuses
 
     /// <summary> Tài khoản bị khóa bởi Quản lý CLB — không đăng nhập được. </summary>
     public const string Inactive = "Inactive";
+
+    /// <summary> Chủ ngựa bị từ chối duyệt — không đăng nhập được. </summary>
+    public const string Rejected = "Rejected";
 }

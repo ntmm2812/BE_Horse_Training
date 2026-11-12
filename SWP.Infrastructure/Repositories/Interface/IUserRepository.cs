@@ -18,6 +18,9 @@ public interface IUserRepository
 
     Task<IReadOnlyList<User>> GetPendingUsersAsync(CancellationToken cancellationToken = default);
 
+    /// <summary> Chủ ngựa (mọi trạng thái Pending/Active/Rejected/…). </summary>
+    Task<IReadOnlyList<User>> GetHorseOwnerUsersAsync(CancellationToken cancellationToken = default);
+
     Task<User?> GetByIdWithRoleAsync(int userId, CancellationToken cancellationToken = default);
 
     Task<User?> GetByIdWithRoleReadAsync(int userId, CancellationToken cancellationToken = default);
