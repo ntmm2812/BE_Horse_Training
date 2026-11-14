@@ -69,8 +69,9 @@ public class RacesController : ControllerBase
         return NoContent();
     }
 
+    // Quản lý CLB nhập kết quả trên /manager/race-results; HLV vẫn được ghi nếu cần.
     [HttpPut("{raceId:int}/registrations/{horseId:int}/result")]
-    [Authorize(Roles = RoleNames.HeadTrainer)]
+    [Authorize(Roles = RoleNames.ClubManager + "," + RoleNames.HeadTrainer)]
     public async Task<IActionResult> UpdateResult(
         int raceId,
         int horseId,

@@ -51,6 +51,11 @@ public class AuthService : IAuthService
             return LoginResult.Fail("Tài khoản đang chờ Quản lý CLB duyệt.", "PENDING_APPROVAL");
         }
 
+        if (string.Equals(user.Status, UserStatuses.Rejected, StringComparison.OrdinalIgnoreCase))
+        {
+            return LoginResult.Fail("Tài khoản đã bị từ chối duyệt.", "ACCOUNT_REJECTED");
+        }
+
         if (string.Equals(user.Status, UserStatuses.Inactive, StringComparison.OrdinalIgnoreCase))
         {
             return LoginResult.Fail("Tài khoản đã bị khóa, liên hệ Quản lý CLB.", "ACCOUNT_LOCKED");

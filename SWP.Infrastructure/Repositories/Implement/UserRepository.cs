@@ -98,6 +98,21 @@ public class UserRepository : IUserRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetHorseOwnerUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .ToListAsync(cancellationToken);
+
+        return users
+            .Where(u =>
+                RoleMapper.TryMapToCanonicalRoleId(u.Role.RoleName, out var mapped)
+                && string.Equals(mapped, RoleNames.HorseOwner, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(u => u.CreatedAt)
+            .ToList();
+    }
+
     public async Task<User?> GetByIdWithRoleAsync(int userId, CancellationToken cancellationToken = default)
     {
         return await _context.Users
