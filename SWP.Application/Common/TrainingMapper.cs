@@ -46,6 +46,7 @@ public static class TrainingMapper
             TrialVideoUrl = session.TrialVideoUrl,
             CreatedAt = session.CreatedAt,
             Report = ToReportDto(session.Report),
+            Review = ToReviewDto(session.Review),
         };
     }
 
@@ -59,6 +60,18 @@ public static class TrainingMapper
             Note = report.Note,
             ReportedByName = report.ReportedByUser?.FullName,
             ReportedAt = report.ReportedAt,
+        };
+
+    public static SessionReviewDto? ToReviewDto(TrainingSessionReview? review, string? reviewerName = null) => review is null
+        ? null
+        : new SessionReviewDto
+        {
+            Score = review.Score,
+            Assessment = review.Assessment,
+            Comment = review.Comment,
+            ReviewedByName = review.ReviewedByUser?.FullName ?? reviewerName,
+            ReviewedAt = review.ReviewedAt,
+            SentToOwnerAt = review.SentToOwnerAt,
         };
 
     public static TrainingSessionDto ToPreviewDto(GeneratedSession generated, TrainingPlan plan, int? assignedToUserId)

@@ -33,6 +33,7 @@ public class TrainingSessionRepository : ITrainingSessionRepository
             .Include(s => s.Phase)
             .Include(s => s.AssignedToUser)
             .Include(s => s.Report).ThenInclude(r => r!.ReportedByUser)
+            .Include(s => s.Review).ThenInclude(r => r!.ReviewedByUser)
             .Where(s => s.TrainingDate >= start && s.TrainingDate < endExclusive);
 
         if (horseId is not null)
@@ -70,6 +71,7 @@ public class TrainingSessionRepository : ITrainingSessionRepository
             .Include(s => s.Phase)
             .Include(s => s.AssignedToUser)
             .Include(s => s.Report).ThenInclude(r => r!.ReportedByUser)
+            .Include(s => s.Review).ThenInclude(r => r!.ReviewedByUser)
             .FirstOrDefaultAsync(s => s.ScheduleId == sessionId, cancellationToken);
     }
 
@@ -80,6 +82,7 @@ public class TrainingSessionRepository : ITrainingSessionRepository
             .Include(s => s.Plan).ThenInclude(p => p.Phases)
             .Include(s => s.AssignedToUser)
             .Include(s => s.Report).ThenInclude(r => r!.ReportedByUser)
+            .Include(s => s.Review).ThenInclude(r => r!.ReviewedByUser)
             .FirstOrDefaultAsync(s => s.ScheduleId == sessionId, cancellationToken);
     }
 
@@ -183,6 +186,47 @@ public class TrainingSessionRepository : ITrainingSessionRepository
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TrainingSessionReview>> GetSentReviewsForOwnerAsync(
+        int ownerUserId,
+        int? horseId = null,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        int? limit = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.TrainingSessionReviews
+            .AsNoTracking()
+            .Include(r => r.ReviewedByUser)
+            .Include(r => r.Schedule).ThenInclude(s => s.Plan).ThenInclude(p => p.Horse)
+            .Where(r => r.SentToOwnerAt != null && r.Schedule.Plan.Horse.UserId == ownerUserId);
+
+        if (horseId is not null)
+        {
+            query = query.Where(r => r.Schedule.Plan.HorseId == horseId);
+        }
+
+        if (from is not null)
+        {
+            var start = from.Value.ToDateTime(TimeOnly.MinValue);
+            query = query.Where(r => r.Schedule.TrainingDate >= start);
+        }
+
+        if (to is not null)
+        {
+            var endExclusive = to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            query = query.Where(r => r.Schedule.TrainingDate < endExclusive);
+        }
+
+        var ordered = query
+            .OrderByDescending(r => r.Schedule.TrainingDate)
+            .ThenByDescending(r => r.SentToOwnerAt)
+            .ThenByDescending(r => r.Id);
+
+        return limit is > 0
+            ? await ordered.Take(limit.Value).ToListAsync(cancellationToken)
+            : await ordered.ToListAsync(cancellationToken);
     }
 
     private static (DateTime Start, DateTime EndExclusive) ToRange(DateOnly from, DateOnly to) =>

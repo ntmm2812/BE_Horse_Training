@@ -343,6 +343,219 @@ public class TrainingSessionService : ITrainingSessionService
         return ServiceResult<SessionReportDto>.Ok(TrainingMapper.ToReportDto(session.Report)!);
     }
 
+    public async Task<ServiceResult<SessionReviewDto>> SubmitReviewAsync(
+        int sessionId,
+        int trainerId,
+        SubmitSessionReviewRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetForUpdateAsync(sessionId, cancellationToken);
+        var rejected = CheckReviewable(session);
+        if (rejected is not null)
+        {
+            return rejected;
+        }
+
+        if (session!.Review is not null)
+        {
+            return ServiceResult<SessionReviewDto>.Fail(ServiceErrorCodes.Conflict, "Buổi tập này đã có đánh giá.");
+        }
+
+        var invalid = ValidateReview(request, out var score, out var assessment, out var comment);
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        session.Review = new TrainingSessionReview
+        {
+            Score = score,
+            Assessment = assessment,
+            Comment = comment,
+            ReviewedByUserId = trainerId,
+            ReviewedAt = _timeProvider.GetUtcNow().UtcDateTime,
+        };
+
+        await _sessionRepository.SaveChangesAsync(cancellationToken);
+        return ServiceResult<SessionReviewDto>.Ok(await ToReviewResultAsync(session.Review, trainerId, cancellationToken));
+    }
+
+    public async Task<ServiceResult<SessionReviewDto>> UpdateReviewAsync(
+        int sessionId,
+        int trainerId,
+        SubmitSessionReviewRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetForUpdateAsync(sessionId, cancellationToken);
+        var rejected = CheckReviewable(session);
+        if (rejected is not null)
+        {
+            return rejected;
+        }
+
+        if (session!.Review is null)
+        {
+            return ServiceResult<SessionReviewDto>.NotFound("Buổi tập này chưa có đánh giá.");
+        }
+
+        if (session.Review.SentToOwnerAt is not null)
+        {
+            return ServiceResult<SessionReviewDto>.Fail(
+                ServiceErrorCodes.Conflict,
+                "Đánh giá đã gửi chủ ngựa, không thể sửa.");
+        }
+
+        var invalid = ValidateReview(request, out var score, out var assessment, out var comment);
+        if (invalid is not null)
+        {
+            return invalid;
+        }
+
+        session.Review.Score = score;
+        session.Review.Assessment = assessment;
+        session.Review.Comment = comment;
+        session.Review.ReviewedByUserId = trainerId;
+        session.Review.ReviewedAt = _timeProvider.GetUtcNow().UtcDateTime;
+
+        await _sessionRepository.SaveChangesAsync(cancellationToken);
+        return ServiceResult<SessionReviewDto>.Ok(await ToReviewResultAsync(session.Review, trainerId, cancellationToken));
+    }
+
+    public async Task<ServiceResult<SessionReviewDto>> SendReviewToOwnerAsync(
+        int sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetForUpdateAsync(sessionId, cancellationToken);
+        if (session is null)
+        {
+            return ServiceResult<SessionReviewDto>.NotFound(SessionNotFound);
+        }
+
+        if (session.Review is null)
+        {
+            return ServiceResult<SessionReviewDto>.Fail(
+                ServiceErrorCodes.InvalidStatus,
+                "Buổi tập này chưa có đánh giá để gửi.");
+        }
+
+        if (session.Review.SentToOwnerAt is not null)
+        {
+            return ServiceResult<SessionReviewDto>.Fail(ServiceErrorCodes.Conflict, "Đánh giá đã gửi chủ ngựa.");
+        }
+
+        session.Review.SentToOwnerAt = _timeProvider.GetUtcNow().UtcDateTime;
+
+        await _sessionRepository.SaveChangesAsync(cancellationToken);
+        return ServiceResult<SessionReviewDto>.Ok(TrainingMapper.ToReviewDto(session.Review)!);
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<OwnerSessionReviewDto>>> GetOwnerReviewsAsync(
+        int ownerUserId,
+        int? horseId,
+        DateOnly? from,
+        DateOnly? to,
+        int? limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (horseId is not null
+            && await _horseRepository.GetByIdForOwnerAsync(horseId.Value, ownerUserId, cancellationToken) is null)
+        {
+            return ServiceResult<IReadOnlyList<OwnerSessionReviewDto>>.NotFound(
+                "Không tìm thấy ngựa hoặc ngựa không thuộc quyền sở hữu của bạn.");
+        }
+
+        if (from is not null && to is not null && to < from)
+        {
+            return ServiceResult<IReadOnlyList<OwnerSessionReviewDto>>.Invalid(
+                "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
+        }
+
+        var reviews = await _sessionRepository.GetSentReviewsForOwnerAsync(
+            ownerUserId, horseId, from, to, limit, cancellationToken);
+        return ServiceResult<IReadOnlyList<OwnerSessionReviewDto>>.Ok(reviews
+            .Select(r => new OwnerSessionReviewDto
+            {
+                SessionId = r.ScheduleId,
+                HorseId = r.Schedule.Plan.HorseId,
+                HorseName = r.Schedule.Plan.Horse?.HorseName,
+                TrainingDate = DateOnly.FromDateTime(r.Schedule.TrainingDate),
+                SessionTitle = r.Schedule.SessionTitle,
+                Score = r.Score,
+                Assessment = r.Assessment,
+                Comment = r.Comment,
+                TrainerName = r.ReviewedByUser?.FullName,
+                SentAt = r.SentToOwnerAt!.Value,
+            })
+            .ToList());
+    }
+
+    // Buổi phải tồn tại, chưa hủy và đã có báo cáo (bất kể kết quả hay quãng đường) mới đánh giá được.
+    private static ServiceResult<SessionReviewDto>? CheckReviewable(TrainingSchedule? session)
+    {
+        if (session is null)
+        {
+            return ServiceResult<SessionReviewDto>.NotFound(SessionNotFound);
+        }
+
+        if (TrainingSessionStatuses.Is(session.Status, TrainingSessionStatuses.Cancelled))
+        {
+            return ServiceResult<SessionReviewDto>.Fail(ServiceErrorCodes.InvalidStatus, "Buổi tập đã hủy.");
+        }
+
+        if (session.Report is null)
+        {
+            return ServiceResult<SessionReviewDto>.Fail(
+                ServiceErrorCodes.InvalidStatus,
+                "Buổi tập chưa có báo cáo, chưa thể đánh giá.");
+        }
+
+        return null;
+    }
+
+    private static ServiceResult<SessionReviewDto>? ValidateReview(
+        SubmitSessionReviewRequestDto request,
+        out int score,
+        out string assessment,
+        out string comment)
+    {
+        score = request.Score ?? 0;
+        assessment = string.Empty;
+        comment = (request.Comment ?? string.Empty).Trim();
+
+        if (request.Score is not { } value || value < TrainingReviewOptions.MinScore || value > TrainingReviewOptions.MaxScore)
+        {
+            return ServiceResult<SessionReviewDto>.Invalid(
+                $"Điểm phong độ từ {TrainingReviewOptions.MinScore} đến {TrainingReviewOptions.MaxScore}.");
+        }
+
+        if (!TrainingReviewOptions.TryNormalizeAssessment(request.Assessment, out assessment))
+        {
+            return ServiceResult<SessionReviewDto>.Invalid("Vui lòng chọn nhận định.");
+        }
+
+        if (comment.Length == 0)
+        {
+            return ServiceResult<SessionReviewDto>.Invalid("Vui lòng nhập nhận xét.");
+        }
+
+        if (comment.Length > TrainingReviewOptions.MaxCommentLength)
+        {
+            return ServiceResult<SessionReviewDto>.Invalid(
+                $"Nhận xét tối đa {TrainingReviewOptions.MaxCommentLength} ký tự.");
+        }
+
+        return null;
+    }
+
+    private async Task<SessionReviewDto> ToReviewResultAsync(
+        TrainingSessionReview review,
+        int trainerId,
+        CancellationToken cancellationToken)
+    {
+        var trainer = await _userRepository.GetByIdWithRoleReadAsync(trainerId, cancellationToken);
+        return TrainingMapper.ToReviewDto(review, trainer?.FullName)!;
+    }
+
     public async Task<ServiceResult<TrainingSessionDto>> CancelAsync(
         int sessionId,
         CancelTrainingSessionRequestDto request,
@@ -434,7 +647,12 @@ public class TrainingSessionService : ITrainingSessionService
             rangeFrom, rangeTo, assignedToUserId: userId, cancellationToken: cancellationToken);
         return ServiceResult<IReadOnlyList<TrainingSessionDto>>.Ok(sessions
             .Where(s => !TrainingSessionStatuses.Is(s.Status, TrainingSessionStatuses.Cancelled))
-            .Select(s => TrainingMapper.ToSessionDto(s))
+            .Select(s =>
+            {
+                var dto = TrainingMapper.ToSessionDto(s);
+                dto.Review = null; // nhân viên chăm sóc không xem đánh giá của HLV
+                return dto;
+            })
             .ToList());
     }
 

@@ -163,6 +163,7 @@ namespace SWP.API
                     UserSchemaUpdater.Apply(db);
                     ApprovalSchemaUpdater.Apply(db);
                     TrainingReportSchemaUpdater.Apply(db);
+                    TrainingReviewSchemaUpdater.Apply(db);
                 }
             }
 

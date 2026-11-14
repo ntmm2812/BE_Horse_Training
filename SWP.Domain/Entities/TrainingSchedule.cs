@@ -60,4 +60,6 @@ public class TrainingSchedule
     public virtual TrainingPlanPhase? Phase { get; set; }
 
     public virtual TrainingSessionReport? Report { get; set; }
+
+    public virtual TrainingSessionReview? Review { get; set; }
 }
