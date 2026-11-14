@@ -68,6 +68,9 @@ public class TrainingSessionDto
 
     /// <summary> Báo cáo của nhân viên chăm sóc; null nếu chưa có. </summary>
     public SessionReportDto? Report { get; set; }
+
+    /// <summary> Đánh giá của HLV; null nếu chưa có hoặc người xem là nhân viên chăm sóc. </summary>
+    public SessionReviewDto? Review { get; set; }
 }
 
 public class TrainingSessionQueryDto

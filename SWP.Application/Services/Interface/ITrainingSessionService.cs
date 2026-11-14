@@ -39,6 +39,30 @@ public interface ITrainingSessionService
         SubmitSessionReportRequestDto request,
         CancellationToken cancellationToken = default);
 
+    Task<ServiceResult<SessionReviewDto>> SubmitReviewAsync(
+        int sessionId,
+        int trainerId,
+        SubmitSessionReviewRequestDto request,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<SessionReviewDto>> UpdateReviewAsync(
+        int sessionId,
+        int trainerId,
+        SubmitSessionReviewRequestDto request,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<SessionReviewDto>> SendReviewToOwnerAsync(
+        int sessionId,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<IReadOnlyList<OwnerSessionReviewDto>>> GetOwnerReviewsAsync(
+        int ownerUserId,
+        int? horseId,
+        DateOnly? from,
+        DateOnly? to,
+        int? limit,
+        CancellationToken cancellationToken = default);
+
     Task<ServiceResult<TrainingSessionDto>> CancelAsync(
         int sessionId,
         CancelTrainingSessionRequestDto request,

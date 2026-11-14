@@ -85,6 +85,46 @@ public class TrainerTrainingSessionsController : TrainingControllerBase
         return await FromResultNotify(result, HorseRealtimeKinds.TapLuyen, cancellationToken);
     }
 
+    /// <summary> HLV đánh giá buổi tập đã có báo cáo (điểm 1–10, nhận định, nhận xét). Chủ ngựa chưa thấy cho đến khi gửi. </summary>
+    [HttpPost("{sessionId:int}/review")]
+    public async Task<IActionResult> SubmitReview(
+        int sessionId,
+        [FromBody] SubmitSessionReviewRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+        {
+            return UnknownUser();
+        }
+
+        var result = await _trainingSessionService.SubmitReviewAsync(sessionId, userId, request, cancellationToken);
+        return await ReviewResultNotify(result, sessionId, cancellationToken);
+    }
+
+    /// <summary> Sửa đánh giá khi chưa gửi chủ ngựa; đã gửi thì 409. </summary>
+    [HttpPut("{sessionId:int}/review")]
+    public async Task<IActionResult> UpdateReview(
+        int sessionId,
+        [FromBody] SubmitSessionReviewRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+        {
+            return UnknownUser();
+        }
+
+        var result = await _trainingSessionService.UpdateReviewAsync(sessionId, userId, request, cancellationToken);
+        return await ReviewResultNotify(result, sessionId, cancellationToken);
+    }
+
+    /// <summary> Gửi đánh giá đã lưu cho chủ ngựa; gửi rồi thì không sửa và không gửi lại được. </summary>
+    [HttpPost("{sessionId:int}/review/send-to-owner")]
+    public async Task<IActionResult> SendReviewToOwner(int sessionId, CancellationToken cancellationToken)
+    {
+        var result = await _trainingSessionService.SendReviewToOwnerAsync(sessionId, cancellationToken);
+        return await ReviewResultNotify(result, sessionId, cancellationToken);
+    }
+
     [HttpPost("{sessionId:int}/cancel")]
     public async Task<IActionResult> Cancel(
         int sessionId,
@@ -106,6 +146,23 @@ public class TrainerTrainingSessionsController : TrainingControllerBase
         }
 
         return NoContentFrom(result);
+    }
+
+    private async Task<IActionResult> ReviewResultNotify(
+        ServiceResult<SessionReviewDto> result,
+        int sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (result.Success)
+        {
+            var session = await _trainingSessionService.GetByIdAsync(sessionId, cancellationToken);
+            if (session.Success && session.Data is not null)
+            {
+                await _realtime.NotifyHorseChangedAsync(session.Data.HorseId, HorseRealtimeKinds.TapLuyen, cancellationToken);
+            }
+        }
+
+        return FromResult(result);
     }
 
     private async Task<IActionResult> FromResultNotify(
