@@ -57,6 +57,8 @@ public class ApplicationDbContext : DbContext
 
     public virtual DbSet<TrainingSchedule> TrainingSchedules { get; set; }
 
+    public virtual DbSet<TrainingSessionReport> TrainingSessionReports { get; set; }
+
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<VaccinationSchedule> VaccinationSchedules { get; set; }

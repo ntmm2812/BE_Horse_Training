@@ -33,6 +33,12 @@ public interface ITrainingSessionService
         CompleteTrainingSessionRequestDto request,
         CancellationToken cancellationToken = default);
 
+    Task<ServiceResult<SessionReportDto>> SubmitReportAsync(
+        int sessionId,
+        int groomId,
+        SubmitSessionReportRequestDto request,
+        CancellationToken cancellationToken = default);
+
     Task<ServiceResult<TrainingSessionDto>> CancelAsync(
         int sessionId,
         CancelTrainingSessionRequestDto request,

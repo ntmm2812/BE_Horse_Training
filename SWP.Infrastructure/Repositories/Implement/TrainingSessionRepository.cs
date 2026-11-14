@@ -32,6 +32,7 @@ public class TrainingSessionRepository : ITrainingSessionRepository
             .Include(s => s.Plan).ThenInclude(p => p.Horse)
             .Include(s => s.Phase)
             .Include(s => s.AssignedToUser)
+            .Include(s => s.Report).ThenInclude(r => r!.ReportedByUser)
             .Where(s => s.TrainingDate >= start && s.TrainingDate < endExclusive);
 
         if (horseId is not null)
@@ -68,6 +69,7 @@ public class TrainingSessionRepository : ITrainingSessionRepository
             .Include(s => s.Plan).ThenInclude(p => p.Horse)
             .Include(s => s.Phase)
             .Include(s => s.AssignedToUser)
+            .Include(s => s.Report).ThenInclude(r => r!.ReportedByUser)
             .FirstOrDefaultAsync(s => s.ScheduleId == sessionId, cancellationToken);
     }
 
@@ -77,6 +79,7 @@ public class TrainingSessionRepository : ITrainingSessionRepository
             .Include(s => s.Plan).ThenInclude(p => p.Horse)
             .Include(s => s.Plan).ThenInclude(p => p.Phases)
             .Include(s => s.AssignedToUser)
+            .Include(s => s.Report).ThenInclude(r => r!.ReportedByUser)
             .FirstOrDefaultAsync(s => s.ScheduleId == sessionId, cancellationToken);
     }
 

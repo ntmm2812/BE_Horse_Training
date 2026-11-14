@@ -45,8 +45,21 @@ public static class TrainingMapper
             TrainerComment = session.TrainerComment,
             TrialVideoUrl = session.TrialVideoUrl,
             CreatedAt = session.CreatedAt,
+            Report = ToReportDto(session.Report),
         };
     }
+
+    public static SessionReportDto? ToReportDto(TrainingSessionReport? report) => report is null
+        ? null
+        : new SessionReportDto
+        {
+            Result = report.Result,
+            ActualDistanceKm = report.ActualDistanceKm,
+            HorseReaction = report.HorseReaction,
+            Note = report.Note,
+            ReportedByName = report.ReportedByUser?.FullName,
+            ReportedAt = report.ReportedAt,
+        };
 
     public static TrainingSessionDto ToPreviewDto(GeneratedSession generated, TrainingPlan plan, int? assignedToUserId)
     {
