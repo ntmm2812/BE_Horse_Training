@@ -14,8 +14,9 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 
         entity.Property(e => e.LogId).HasColumnName("LogID");
         entity.Property(e => e.Action)
-            .HasMaxLength(50)
-            .IsUnicode(false);
+            .HasMaxLength(300);
+        entity.Property(e => e.TargetLabel)
+            .HasMaxLength(200);
         entity.Property(e => e.CreatedAt).HasColumnType("datetime");
         entity.Property(e => e.Ipaddress)
             .HasMaxLength(45)

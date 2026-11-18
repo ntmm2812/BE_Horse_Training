@@ -443,7 +443,23 @@ public class TrainingSessionService : ITrainingSessionService
             return ServiceResult<SessionReviewDto>.Fail(ServiceErrorCodes.Conflict, "Đánh giá đã gửi chủ ngựa.");
         }
 
+        if (TrainingSessionStatuses.Is(session.Status, TrainingSessionStatuses.Cancelled))
+        {
+            return ServiceResult<SessionReviewDto>.Fail(ServiceErrorCodes.InvalidStatus, "Buổi tập đã hủy.");
+        }
+
         session.Review.SentToOwnerAt = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // HLV gửi đánh giá = buổi hoàn thành, trừ khi ngựa không tập. Buổi đã Completed theo luồng cũ giữ nguyên.
+        if (session.Report is { } report
+            && report.Result != TrainingReportOptions.NotTrained
+            && !TrainingSessionStatuses.Is(session.Status, TrainingSessionStatuses.Completed))
+        {
+            session.Status = TrainingSessionStatuses.Completed;
+            session.ActualDistanceKm ??= report.ActualDistanceKm;
+            // Cùng thang 10 điểm với PerformanceScore (0–10); điểm đánh giá 1–10 nằm trong khoảng đó.
+            session.PerformanceScore ??= session.Review.Score;
+        }
 
         await _sessionRepository.SaveChangesAsync(cancellationToken);
         return ServiceResult<SessionReviewDto>.Ok(TrainingMapper.ToReviewDto(session.Review)!);
