@@ -413,6 +413,11 @@ public class TrainingPlanService : ITrainingPlanService
                 "Tuần được chọn nằm ngoài thời gian của giáo án.");
         }
 
+        // Sinh lịch xuyên suốt từ tuần được chọn đến hết ngày kết thúc giáo án để bao phủ đầy đủ tất cả các giai đoạn.
+        var lastDate = plan.EndDate is { } end && end > weekEnd ? end : weekEnd;
+        var lastWeekStart = TrainingRules.WeekStartOf(lastDate);
+        var rangeEnd = lastWeekStart.AddDays(6);
+
         var fitness = await _fitnessService.GetAssessmentAsync(plan.HorseId, cancellationToken);
         if (fitness is null)
         {
@@ -429,7 +434,7 @@ public class TrainingPlanService : ITrainingPlanService
 
         var today = Today;
         var existing = await _sessionRepository.SearchAsync(
-            weekStart, weekEnd, horseId: plan.HorseId, cancellationToken: cancellationToken);
+            weekStart, rangeEnd, horseId: plan.HorseId, cancellationToken: cancellationToken);
         var replaceable = request.ReplaceExisting
             ? existing
                 .Where(s => s.PlanId == planId
@@ -444,42 +449,70 @@ public class TrainingPlanService : ITrainingPlanService
             .Select(s => DateOnly.FromDateTime(s.TrainingDate))
             .ToHashSet();
 
-        var output = WeeklyScheduleGenerator.Generate(new WeeklyGenerationInput
+        var phaseSpecs = plan.Phases
+            .Select(p => new PhaseSpec(
+                p.PhaseId,
+                p.PhaseName,
+                p.StartDate,
+                p.EndDate,
+                p.IntensityLevel,
+                p.SessionsPerWeek,
+                p.TargetDistanceKm,
+                p.SessionDurationMinutes,
+                p.Surface))
+            .ToList();
+
+        var allSessions = new List<GeneratedSession>();
+        var allSkipped = new List<SkippedDay>();
+        var allWarnings = new List<string>();
+        var warningSeen = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var currentWeek = weekStart; currentWeek <= lastWeekStart; currentWeek = currentWeek.AddDays(7))
         {
-            WeekStart = weekStart,
-            Phases = plan.Phases
-                .Select(p => new PhaseSpec(
-                    p.PhaseId,
-                    p.PhaseName,
-                    p.StartDate,
-                    p.EndDate,
-                    p.IntensityLevel,
-                    p.SessionsPerWeek,
-                    p.TargetDistanceKm,
-                    p.SessionDurationMinutes,
-                    p.Surface))
-                .ToList(),
-            MaxAllowedIntensity = fitness.MaxAllowedIntensity,
-            Today = today,
-            OccupiedDates = occupied,
-            StartTime = startTime,
-        });
+            var output = WeeklyScheduleGenerator.Generate(new WeeklyGenerationInput
+            {
+                WeekStart = currentWeek,
+                Phases = phaseSpecs,
+                MaxAllowedIntensity = fitness.MaxAllowedIntensity,
+                Today = today,
+                OccupiedDates = occupied,
+                StartTime = startTime,
+            });
+
+            foreach (var session in output.Sessions)
+            {
+                allSessions.Add(session);
+                occupied.Add(session.Date);
+            }
+
+            allSkipped.AddRange(output.SkippedDays);
+            foreach (var warning in output.Warnings)
+            {
+                if (warningSeen.Add(warning))
+                {
+                    allWarnings.Add(warning);
+                }
+            }
+        }
+
+        allSessions.Sort((a, b) => a.Date.CompareTo(b.Date));
+        allSkipped.Sort((a, b) => a.Date.CompareTo(b.Date));
 
         var result = new WeeklyScheduleGenerationResultDto
         {
             PlanId = planId,
             WeekStartDate = weekStart,
-            WeekEndDate = weekEnd,
+            WeekEndDate = lastDate,
             PreviewOnly = request.PreviewOnly,
-            SkippedDays = output.SkippedDays
+            SkippedDays = allSkipped
                 .Select(d => new SkippedDayDto { Date = d.Date, Reason = d.Reason })
                 .ToList(),
-            Warnings = output.Warnings,
+            Warnings = allWarnings,
         };
 
         if (request.PreviewOnly)
         {
-            result.Sessions = output.Sessions
+            result.Sessions = allSessions
                 .Select(g => TrainingMapper.ToPreviewDto(g, plan, assignee?.UserId))
                 .ToList();
             return ServiceResult<WeeklyScheduleGenerationResultDto>.Ok(result);
@@ -488,13 +521,13 @@ public class TrainingPlanService : ITrainingPlanService
         if (replaceable.Count > 0)
         {
             var toRemove = await _sessionRepository.GetScheduledForPlanInRangeAsync(
-                planId, today > weekStart ? today : weekStart, weekEnd, cancellationToken);
+                planId, today > weekStart ? today : weekStart, rangeEnd, cancellationToken);
             _sessionRepository.RemoveRange(toRemove);
             result.RemovedCount = toRemove.Count;
         }
 
         var createdAt = UtcNow;
-        var entities = output.Sessions
+        var entities = allSessions
             .Select(g => new TrainingSchedule
             {
                 PlanId = plan.PlanId,
