@@ -164,6 +164,7 @@ namespace SWP.API
                     ApprovalSchemaUpdater.Apply(db);
                     TrainingReportSchemaUpdater.Apply(db);
                     TrainingReviewSchemaUpdater.Apply(db);
+                    AuditLogSchemaUpdater.Apply(db);
                 }
             }
 
