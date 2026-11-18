@@ -13,6 +13,9 @@ public class AuditLog
 
     public int? RecordId { get; set; }
 
+    /// <summary> Tên đối tượng lúc ghi (vd tên ngựa) để hiển thị cả khi bản ghi đã bị xóa. </summary>
+    public string? TargetLabel { get; set; }
+
     public string? OldValue { get; set; }
 
     public string? NewValue { get; set; }
