@@ -18,8 +18,7 @@ public class HorseConfiguration : IEntityTypeConfiguration<Horse>
         entity.Property(e => e.CreatedAt).HasColumnType("datetime");
         entity.Property(e => e.Description).HasMaxLength(500);
         entity.Property(e => e.Gender)
-            .HasMaxLength(20)
-            .IsUnicode(false);
+            .HasMaxLength(20);
         entity.Property(e => e.Height).HasColumnType("decimal(5, 2)");
         entity.Property(e => e.HorseName).HasMaxLength(100);
         entity.Property(e => e.ImageUrl)

@@ -125,7 +125,7 @@ public class VetController : ControllerBase
     }
 
     [HttpGet("training-locks")]
-    [Authorize(Roles = RoleNames.Veterinarian + "," + RoleNames.HeadTrainer + "," + RoleNames.HorseOwner)]
+    [Authorize(Roles = RoleNames.Veterinarian + "," + RoleNames.HeadTrainer + "," + RoleNames.HorseOwner + "," + RoleNames.ClubManager)]
     public async Task<IActionResult> GetLocks([FromQuery] bool activeOnly, CancellationToken cancellationToken)
     {
         if (!TryGetCurrentUserId(out var userId))
@@ -181,7 +181,7 @@ public class VetController : ControllerBase
     }
 
     [HttpGet("vaccinations")]
-    [Authorize(Roles = RoleNames.Veterinarian + "," + RoleNames.HeadTrainer + "," + RoleNames.HorseOwner)]
+    [Authorize(Roles = RoleNames.Veterinarian + "," + RoleNames.HeadTrainer + "," + RoleNames.HorseOwner + "," + RoleNames.ClubManager)]
     public async Task<IActionResult> GetVaccinations([FromQuery] int? horseId, CancellationToken cancellationToken)
     {
         if (!TryGetCurrentUserId(out var userId))
