@@ -4,6 +4,7 @@ public class RaceDto
 {
     public string? RegistrationDeadline { get; set; }
     public decimal? EntryFee { get; set; }
+    public int? MaxParticipants { get; set; }
     public string? Status { get; set; }
     public int RaceID { get; set; }
 
