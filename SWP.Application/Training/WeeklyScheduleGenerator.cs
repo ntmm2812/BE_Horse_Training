@@ -104,15 +104,29 @@ public static class WeeklyScheduleGenerator
             var (distanceKm, durationMinutes) = capped
                 ? CappedVolume(phase, effective)
                 : (phase.TargetDistanceKm, phase.SessionDurationMinutes);
+            var candidateDates = pattern
+                .Select(offset => weekStart.AddDays(offset))
+                .Where(d => d >= phase.StartDate && d <= phase.EndDate)
+                .ToList();
+
+            // Nếu giai đoạn có giao với tuần (T2–T7) nhưng ngày mẫu cố định rơi ngoài khoảng ngày ngắn của giai đoạn,
+            // chọn các ngày hợp lệ (trừ Chủ Nhật) nằm trong giai đoạn đó để không bị bỏ sót giai đoạn.
+            if (candidateDates.Count == 0)
+            {
+                var overlapStart = phase.StartDate > weekStart ? phase.StartDate : weekStart;
+                var saturday = weekStart.AddDays(5);
+                var overlapEnd = phase.EndDate < saturday ? phase.EndDate : saturday;
+                for (var d = overlapStart; d <= overlapEnd && candidateDates.Count < phase.SessionsPerWeek; d = d.AddDays(1))
+                {
+                    candidateDates.Add(d);
+                }
+            }
+
             var touchesWeek = false;
 
-            for (var i = 0; i < pattern.Length; i++)
+            for (var i = 0; i < candidateDates.Count; i++)
             {
-                var date = weekStart.AddDays(pattern[i]);
-                if (date < phase.StartDate || date > phase.EndDate)
-                {
-                    continue;
-                }
+                var date = candidateDates[i];
 
                 touchesWeek = true;
                 if (date < input.Today)
@@ -128,7 +142,7 @@ public static class WeeklyScheduleGenerator
                 }
 
                 // Buổi đầu tuần nhẹ để khởi động; một buổi/tuần thì là buổi chính.
-                var isPrimary = pattern.Length == 1 || i % 2 == 1;
+                var isPrimary = candidateDates.Count == 1 || i % 2 == 1;
                 var trainingType = isPrimary ? primary : secondary;
                 sessions.Add(new GeneratedSession(
                     Date: date,

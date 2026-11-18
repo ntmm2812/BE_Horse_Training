@@ -548,12 +548,13 @@ public class TrainingPlanServiceTests : IDisposable
         var data = result.Data!;
         Assert.False(data.PreviewOnly);
         Assert.Equal(Today, data.WeekStartDate);
-        Assert.Equal(Today.AddDays(6), data.WeekEndDate);
-        Assert.Equal(4, data.CreatedCount);
+        Assert.Equal(Today.AddDays(41), data.WeekEndDate);
+        Assert.Equal(28, data.CreatedCount);
+        var firstWeek = data.Sessions.Where(s => s.TrainingDate <= Today.AddDays(6)).ToList();
         Assert.Equal(
             [Today, Today.AddDays(1), Today.AddDays(3), Today.AddDays(4)],
-            data.Sessions.Select(s => s.TrainingDate).ToArray());
-        Assert.All(data.Sessions, s =>
+            firstWeek.Select(s => s.TrainingDate).ToArray());
+        Assert.All(firstWeek, s =>
         {
             Assert.True(s.SessionId > 0);
             Assert.Equal("Nền tảng", s.PhaseName);
@@ -564,7 +565,8 @@ public class TrainingPlanServiceTests : IDisposable
             Assert.True(TrainingIntensityLevels.IsWithin(s.IntensityLevel, TrainingIntensityLevels.Low));
             Assert.Equal(TrainingSessionStatuses.Scheduled, s.Status);
         });
-        Assert.Equal(4, _t.Db(db => db.TrainingSchedules.Count(s => s.PlanId == planId && s.PhaseId != null)));
+        Assert.Contains(data.Sessions, s => s.PhaseName == "Tăng tốc");
+        Assert.Equal(28, _t.Db(db => db.TrainingSchedules.Count(s => s.PlanId == planId && s.PhaseId != null)));
     }
 
     [Fact]
@@ -575,8 +577,8 @@ public class TrainingPlanServiceTests : IDisposable
 
         var result = await _t.PlanService().GenerateWeeklyScheduleAsync(planId, Week(Today.AddDays(28)));
 
-        Assert.Equal(5, result.Data!.CreatedCount);
-        Assert.Equal(2, result.Data.Sessions.Count(s => s.TrainingType == TrainingTypes.Gallop));
+        Assert.Equal(10, result.Data!.CreatedCount);
+        Assert.Equal(4, result.Data.Sessions.Count(s => s.TrainingType == TrainingTypes.Gallop));
         Assert.All(result.Data.Sessions, s => Assert.Equal(TrackSurfaces.Turf, s.Surface));
     }
 
@@ -590,8 +592,8 @@ public class TrainingPlanServiceTests : IDisposable
         var second = await _t.PlanService().GenerateWeeklyScheduleAsync(planId, Week(Today));
 
         Assert.Equal(0, second.Data!.CreatedCount);
-        Assert.Equal(4, second.Data.SkippedDays.Count);
-        Assert.Equal(4, _t.Db(db => db.TrainingSchedules.Count()));
+        Assert.Equal(28, second.Data.SkippedDays.Count);
+        Assert.Equal(28, _t.Db(db => db.TrainingSchedules.Count()));
     }
 
     [Fact]
@@ -605,10 +607,10 @@ public class TrainingPlanServiceTests : IDisposable
 
         var result = await _t.PlanService().GenerateWeeklyScheduleAsync(planId, Week(Today, replace: true, startTime: "07:15"));
 
-        Assert.Equal(3, result.Data!.RemovedCount);
-        Assert.Equal(3, result.Data.CreatedCount);
+        Assert.Equal(27, result.Data!.RemovedCount);
+        Assert.Equal(27, result.Data.CreatedCount);
         Assert.All(result.Data.Sessions, s => Assert.Equal("07:15", s.StartTime));
-        Assert.Equal(4, _t.Db(db => db.TrainingSchedules.Count()));
+        Assert.Equal(28, _t.Db(db => db.TrainingSchedules.Count()));
         Assert.Equal(TrainingSessionStatuses.InProgress, _t.Db(db => db.TrainingSchedules.Single(s => s.ScheduleId == todaySession).Status));
     }
 
@@ -623,7 +625,7 @@ public class TrainingPlanServiceTests : IDisposable
 
         Assert.True(preview.Success);
         Assert.True(preview.Data!.PreviewOnly);
-        Assert.Equal(4, preview.Data.Sessions.Count);
+        Assert.Equal(28, preview.Data.Sessions.Count);
         Assert.Equal(0, preview.Data.CreatedCount);
         Assert.All(preview.Data.Sessions, s => Assert.Equal(0, s.SessionId));
         Assert.Equal(ServiceErrorCodes.InvalidStatus, persist.ErrorCode);
@@ -639,7 +641,8 @@ public class TrainingPlanServiceTests : IDisposable
 
         var result = await _t.PlanService().GenerateWeeklyScheduleAsync(planId, Week(Today.AddDays(2)));
 
-        Assert.Equal([Today.AddDays(3), Today.AddDays(4)], result.Data!.Sessions.Select(s => s.TrainingDate).ToArray());
+        var firstWeek = result.Data!.Sessions.Where(s => s.TrainingDate <= Today.AddDays(6)).ToList();
+        Assert.Equal([Today.AddDays(3), Today.AddDays(4)], firstWeek.Select(s => s.TrainingDate).ToArray());
         Assert.Equal(2, result.Data.SkippedDays.Count(d => d.Reason == "Ngày đã qua."));
     }
 
@@ -717,7 +720,7 @@ public class TrainingPlanServiceTests : IDisposable
 
         var result = await _t.PlanService().GenerateWeeklyScheduleAsync(planId, Week(Today));
 
-        Assert.Equal(3, result.Data!.CreatedCount);
+        Assert.Equal(27, result.Data!.CreatedCount);
         Assert.DoesNotContain(result.Data.Sessions, s => s.TrainingDate == Today.AddDays(1));
     }
 
