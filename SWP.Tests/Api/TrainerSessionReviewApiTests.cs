@@ -218,6 +218,129 @@ public class TrainerSessionReviewApiTests : IClassFixture<TrainingApiFactory>
         await Read(await Review(f.Trainer(), id, Body()), HttpStatusCode.Conflict);
     }
 
+    private (string Status, decimal? Km, decimal? Score, DateTime? EndTime, int PlanId) Stored(int id) => f.WithDb(db =>
+    {
+        var s = db.TrainingSchedules.Single(x => x.ScheduleId == id);
+        return (s.Status, s.ActualDistanceKm, s.PerformanceScore, s.EndTime, s.PlanId);
+    });
+
+    private async Task<(int Completed, int Total)> PlanProgress(int planId)
+    {
+        var plan = await Read(await f.Trainer().GetAsync($"/api/trainer/training-plans/{planId}"));
+        var progress = plan.GetProperty("progress");
+        return (progress.GetProperty("completedSessions").GetInt32(), progress.GetProperty("totalSessions").GetInt32());
+    }
+
+    [Fact]
+    public async Task Send_CompletesSession_CopiesKmAndScore_AndRaisesPlanProgress()
+    {
+        var (id, _) = NewSession(km: 4.5m);
+        var planId = Stored(id).PlanId;
+        Assert.Equal(0, (await PlanProgress(planId)).Completed);
+
+        await Read(await Review(f.Trainer(), id, Body(score: 7)));
+        Assert.Equal(TrainingSessionStatuses.Scheduled, Stored(id).Status); // chưa gửi thì chưa hoàn thành
+        await Read(await Send(f.Trainer(), id));
+
+        var stored = Stored(id);
+        Assert.Equal(TrainingSessionStatuses.Completed, stored.Status);
+        Assert.Equal(4.5m, stored.Km);
+        Assert.Equal(7m, stored.Score);
+        Assert.Null(stored.EndTime);
+        var progress = await PlanProgress(planId);
+        Assert.Equal(1, progress.Completed);
+    }
+
+    [Theory]
+    [InlineData("Completed")]
+    [InlineData("Abandoned")]
+    public async Task Send_CompletesSession_ForAnyResultExceptNotTrained(string result)
+    {
+        var (id, _) = NewSession(km: null, result: result);
+        await Read(await Review(f.Trainer(), id, Body()));
+        await Read(await Send(f.Trainer(), id));
+
+        var stored = Stored(id);
+        Assert.Equal(TrainingSessionStatuses.Completed, stored.Status);
+        Assert.Null(stored.Km);
+        Assert.Equal(8m, stored.Score);
+    }
+
+    [Fact]
+    public async Task Send_NotTrained_KeepsStatusAndDoesNotRaiseProgress()
+    {
+        var (id, _) = NewSession(km: null, result: "NotTrained");
+        var planId = Stored(id).PlanId;
+        await Read(await Review(f.Trainer(), id, Body()));
+        await Read(await Send(f.Trainer(), id));
+
+        var stored = Stored(id);
+        Assert.Equal(TrainingSessionStatuses.Scheduled, stored.Status);
+        Assert.Null(stored.Score);
+        Assert.Equal(0, (await PlanProgress(planId)).Completed);
+    }
+
+    [Fact]
+    public async Task Send_OnSessionCompletedViaOldFlow_KeepsItsOwnKmAndScore()
+    {
+        var (id, _) = NewSession(km: 4.5m, status: TrainingSessionStatuses.Completed);
+        f.WithDb(db =>
+        {
+            var s = db.TrainingSchedules.Single(x => x.ScheduleId == id);
+            s.ActualDistanceKm = 2.0m;
+            s.PerformanceScore = 9m;
+            db.SaveChanges();
+            return 0;
+        });
+        await Read(await Review(f.Trainer(), id, Body(score: 3)));
+        await Read(await Send(f.Trainer(), id));
+
+        var stored = Stored(id);
+        Assert.Equal(TrainingSessionStatuses.Completed, stored.Status);
+        Assert.Equal(2.0m, stored.Km);
+        Assert.Equal(9m, stored.Score);
+    }
+
+    [Fact]
+    public async Task Send_KeepsExistingPerformanceScore_WhenAlreadySet()
+    {
+        var (id, _) = NewSession(km: 4.5m);
+        f.WithDb(db =>
+        {
+            var s = db.TrainingSchedules.Single(x => x.ScheduleId == id);
+            s.PerformanceScore = 6m;
+            s.ActualDistanceKm = 1.0m;
+            db.SaveChanges();
+            return 0;
+        });
+        await Read(await Review(f.Trainer(), id, Body(score: 9)));
+        await Read(await Send(f.Trainer(), id));
+
+        var stored = Stored(id);
+        Assert.Equal(TrainingSessionStatuses.Completed, stored.Status);
+        Assert.Equal(6m, stored.Score);
+        Assert.Equal(1.0m, stored.Km);
+    }
+
+    [Fact]
+    public async Task Send_OnSessionCancelledAfterReview_IsRejected_AndNothingChanges()
+    {
+        var (id, _) = NewSession();
+        await Read(await Review(f.Trainer(), id, Body()));
+        f.WithDb(db =>
+        {
+            db.TrainingSchedules.Single(x => x.ScheduleId == id).Status = TrainingSessionStatuses.Cancelled;
+            db.SaveChanges();
+            return 0;
+        });
+
+        var error = await Read(await Send(f.Trainer(), id), HttpStatusCode.Conflict);
+        Assert.Equal("INVALID_STATUS", error.GetProperty("code").GetString());
+        Assert.Equal(TrainingSessionStatuses.Cancelled, Stored(id).Status);
+        var owner = await OwnerReviews(Owner());
+        Assert.DoesNotContain(owner.EnumerateArray(), r => r.GetProperty("sessionId").GetInt32() == id);
+    }
+
     [Fact]
     public async Task Owner_SeesOnlySentReviews_WithoutGroomReport()
     {
