@@ -160,6 +160,7 @@ public class TrainingSessionServiceTests : IDisposable
                 TestData.Phase("Tuần 3", Today.AddDays(14), Today.AddDays(20), TrainingIntensityLevels.Low),
             ],
         }, _t.Ids.TrainerId);
+        await _t.ApprovePlanAsync(plan.Data!.PlanId);
         await _t.PlanService().ActivateAsync(plan.Data!.PlanId);
 
         var result = await _t.SessionService().CreateAsync(plan.Data.PlanId, TestData.Session(Today.AddDays(9), TrainingTypes.Trot));

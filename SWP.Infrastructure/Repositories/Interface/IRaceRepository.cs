@@ -18,7 +18,7 @@ public interface IRaceRepository
 
     Task<int> CountActiveRegistrationsAsync(int raceId, CancellationToken cancellationToken = default);
 
-    Task<bool> RankTakenAsync(int raceId, int rank, int exceptRegistrationId, CancellationToken cancellationToken = default);
+    Task<string?> GetRankHolderNameAsync(int raceId, int rank, int exceptRegistrationId, CancellationToken cancellationToken = default);
 
     Task<bool> HorseExistsAsync(int horseId, CancellationToken cancellationToken = default);
 

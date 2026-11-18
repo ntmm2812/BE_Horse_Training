@@ -24,9 +24,4 @@ SWP.API/appsettings.json
 # Separate repository already present in this workspace
 /BE_Horse/
 
-# Frontend
-Frontend/node_modules/
-Frontend/dist/
-Frontend/dist-ssr/
-Frontend/*.local
-Frontend/.env.local
+artifacts/

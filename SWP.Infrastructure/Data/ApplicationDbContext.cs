@@ -37,6 +37,8 @@ public class ApplicationDbContext : DbContext
 
     public virtual DbSet<RaceRegistration> RaceRegistrations { get; set; }
 
+    public virtual DbSet<RaceApproval> RaceApprovals { get; set; }
+
     public virtual DbSet<Role> Roles { get; set; }
 
     public virtual DbSet<RolePermission> RolePermissions { get; set; }
@@ -54,6 +56,10 @@ public class ApplicationDbContext : DbContext
     public virtual DbSet<TrainingLock> TrainingLocks { get; set; }
 
     public virtual DbSet<TrainingSchedule> TrainingSchedules { get; set; }
+
+    public virtual DbSet<TrainingSessionReport> TrainingSessionReports { get; set; }
+
+    public virtual DbSet<TrainingSessionReview> TrainingSessionReviews { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 

@@ -7,14 +7,19 @@ using SWP.Domain.Common;
 
 namespace SWP.API.Realtime;
 
-[Authorize(Roles = RoleNames.HorseOwner)]
+[Authorize(Roles = RoleNames.HorseOwner + "," + RoleNames.HeadTrainer + "," + RoleNames.ClubManager + "," + RoleNames.Groom)]
 public class HorseActivityHub : Hub
 {
     public override async Task OnConnectedAsync()
     {
         if (TryGetUserId(out var userId))
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, HorseRealtimeGroups.Owner(userId));
+            if (Context.User!.IsInRole(RoleNames.HorseOwner))
+                await Groups.AddToGroupAsync(Context.ConnectionId, HorseRealtimeGroups.Owner(userId));
+            else if (Context.User.IsInRole(RoleNames.Groom))
+                await Groups.AddToGroupAsync(Context.ConnectionId, "training-grooms");
+            else
+                await Groups.AddToGroupAsync(Context.ConnectionId, "approval-staff");
         }
 
         await base.OnConnectedAsync();

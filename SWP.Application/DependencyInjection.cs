@@ -11,6 +11,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAccountApprovalService, AccountApprovalService>();
+        services.AddScoped<IStaffService, StaffService>();
         services.AddScoped<IHorseService, HorseService>();
         services.AddScoped<IHorseFitnessService, HorseFitnessService>();
         services.AddScoped<ITrainingPlanService, TrainingPlanService>();
@@ -18,6 +19,8 @@ public static class DependencyInjection
         services.AddScoped<IVeterinaryService, VeterinaryService>();
         services.AddScoped<ICareService, CareService>();
         services.AddScoped<IRaceService, RaceService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<OwnerApprovalService>();
         services.TryAddScoped<IHorseRealtimeNotifier, NullHorseRealtimeNotifier>();
         services.TryAddSingleton(TimeProvider.System);
         return services;

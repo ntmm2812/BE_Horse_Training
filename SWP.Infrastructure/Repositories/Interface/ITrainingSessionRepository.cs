@@ -50,6 +50,15 @@ public interface ITrainingSessionRepository
         DateTime sinceUtc,
         CancellationToken cancellationToken = default);
 
+    /// <summary> Đánh giá ĐÃ GỬI của ngựa thuộc chủ <paramref name="ownerUserId"/>, mới nhất trước – không tracking. </summary>
+    Task<IReadOnlyList<TrainingSessionReview>> GetSentReviewsForOwnerAsync(
+        int ownerUserId,
+        int? horseId = null,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        int? limit = null,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(TrainingSchedule session, CancellationToken cancellationToken = default);
 
     Task AddRangeAsync(IEnumerable<TrainingSchedule> sessions, CancellationToken cancellationToken = default);

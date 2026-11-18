@@ -35,6 +35,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         entity.Property(e => e.Status)
             .HasMaxLength(20)
             .IsUnicode(false);
+        entity.Property(e => e.MustChangePassword)
+            .HasDefaultValue(false);
         entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
 
         entity.HasOne(d => d.Role).WithMany(p => p.Users)

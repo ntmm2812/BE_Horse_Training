@@ -28,6 +28,19 @@ public class TrainingApiTests : IClassFixture<TrainingApiFactory>
         return JsonSerializer.Deserialize<T>(body, Json)!;
     }
 
+    private async Task<HttpResponseMessage> ActivateApproved(HttpClient trainer, int planId)
+    {
+        var approval = await trainer.GetFromJsonAsync<JsonElement>($"/api/approvals/plans/{planId}");
+        if (approval.GetProperty("status").GetString() == "Draft")
+        {
+            var sent = await ReadAsync<JsonElement>(await trainer.PostAsync($"/api/approvals/plans/{planId}/send", null), HttpStatusCode.OK);
+            var owner = _factory.ClientAs(_factory.Ids.OwnerId, "Horse Owner");
+            await ReadAsync<JsonElement>(await owner.PostAsJsonAsync($"/api/approvals/plans/{planId}/decision",
+                new { status = "Approved", version = sent.GetProperty("version").GetString() }), HttpStatusCode.OK);
+        }
+        return await trainer.PostAsync($"/api/trainer/training-plans/{planId}/activate", null);
+    }
+
     private sealed record ErrorBody(string Message, string Code, string[] Details);
 
     // ---------- Phân quyền ----------
@@ -120,7 +133,7 @@ public class TrainingApiTests : IClassFixture<TrainingApiFactory>
 
         // 5. Áp dụng giáo án
         var active = await ReadAsync<TrainingPlanDetailDto>(
-            await trainer.PostAsync($"/api/trainer/training-plans/{planId}/activate", null), HttpStatusCode.OK);
+            await ActivateApproved(trainer, planId), HttpStatusCode.OK);
         Assert.Equal(TrainingPlanStatuses.Active, active.Status);
 
         // 6. Xếp lịch tuần và phân công cho nhân viên chăm sóc
@@ -204,7 +217,7 @@ public class TrainingApiTests : IClassFixture<TrainingApiFactory>
             HttpStatusCode.OK);
         Assert.Equal("Giáo án đã sửa", updated.PlanName);
         Assert.Single(updated.Phases);
-        await trainer.PostAsync($"/api/trainer/training-plans/{draft.PlanId}/activate", null);
+        await ActivateApproved(trainer, draft.PlanId);
 
         // Tìm giáo án theo ngựa + trạng thái
         var plans = await ReadAsync<List<TrainingPlanDto>>(
@@ -290,9 +303,9 @@ public class TrainingApiTests : IClassFixture<TrainingApiFactory>
         var plan = await ReadAsync<TrainingPlanDetailDto>(
             await trainer.PostAsJsonAsync("/api/trainer/training-plans", TestData.ThreePhasePlan(horseId), Json),
             HttpStatusCode.Created);
-        await trainer.PostAsync($"/api/trainer/training-plans/{plan.PlanId}/activate", null);
+        await ActivateApproved(trainer, plan.PlanId);
 
-        var again = await trainer.PostAsync($"/api/trainer/training-plans/{plan.PlanId}/activate", null);
+        var again = await ActivateApproved(trainer, plan.PlanId);
         var delete = await trainer.DeleteAsync($"/api/trainer/training-plans/{plan.PlanId}");
 
         Assert.Equal("INVALID_STATUS", (await ReadAsync<ErrorBody>(again, HttpStatusCode.Conflict)).Code);
@@ -310,7 +323,7 @@ public class TrainingApiTests : IClassFixture<TrainingApiFactory>
         var active = await ReadAsync<TrainingPlanDetailDto>(
             await trainer.PostAsJsonAsync("/api/trainer/training-plans", TestData.ThreePhasePlan(activeHorse), Json),
             HttpStatusCode.Created);
-        await trainer.PostAsync($"/api/trainer/training-plans/{active.PlanId}/activate", null);
+        await ActivateApproved(trainer, active.PlanId);
         var session = await ReadAsync<TrainingSessionDto>(
             await trainer.PostAsJsonAsync($"/api/trainer/training-plans/{active.PlanId}/sessions",
                 TestData.Session(Today.AddDays(1), TrainingTypes.Trot), Json),

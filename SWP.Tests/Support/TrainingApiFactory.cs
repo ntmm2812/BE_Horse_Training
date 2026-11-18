@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using SWP.Domain.Models.Entity;
 using SWP.Infrastructure.Persistence;
 using SWP.Infrastructure.Security.Interface;
@@ -38,6 +40,11 @@ public sealed class TrainingApiFactory : WebApplicationFactory<SWP.API.Program>
     {
         _connection.Open();
         builder.UseEnvironment("Development");
+        builder.ConfigureLogging(logging => logging.ClearProviders());
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["LocalDemo:Enabled"] = "false",
+        }));
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();

@@ -65,6 +65,12 @@ public class TrainingSessionDto
     public string? TrialVideoUrl { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary> Báo cáo của nhân viên chăm sóc; null nếu chưa có. </summary>
+    public SessionReportDto? Report { get; set; }
+
+    /// <summary> Đánh giá của HLV; null nếu chưa có hoặc người xem là nhân viên chăm sóc. </summary>
+    public SessionReviewDto? Review { get; set; }
 }
 
 public class TrainingSessionQueryDto
@@ -86,6 +92,7 @@ public class TrainingSessionQueryDto
 
 public class SaveTrainingSessionRequestDto
 {
+    public bool UsePlanAssignee { get; set; } = true;
     public DateOnly TrainingDate { get; set; }
 
     /// <summary> "HH:mm"; mặc định 06:00. </summary>

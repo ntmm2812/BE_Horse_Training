@@ -69,14 +69,15 @@ public class RaceRepository : IRaceRepository
     public Task<int> CountActiveRegistrationsAsync(int raceId, CancellationToken cancellationToken = default) =>
         ActiveRegistrations().CountAsync(r => r.RaceId == raceId, cancellationToken);
 
-    public Task<bool> RankTakenAsync(
+    public Task<string?> GetRankHolderNameAsync(
         int raceId,
         int rank,
         int exceptRegistrationId,
         CancellationToken cancellationToken = default) =>
-        ActiveRegistrations().AnyAsync(
-            r => r.RaceId == raceId && r.RegistrationId != exceptRegistrationId && r.FinishPosition == rank,
-            cancellationToken);
+        ActiveRegistrations()
+            .Where(r => r.RaceId == raceId && r.RegistrationId != exceptRegistrationId && r.FinishPosition == rank)
+            .Select(r => r.Horse.HorseName)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public Task<bool> HorseExistsAsync(int horseId, CancellationToken cancellationToken = default) =>
         _db.Horses.AnyAsync(h => h.HorseId == horseId, cancellationToken);
@@ -102,7 +103,17 @@ public class RaceRepository : IRaceRepository
 
     public void AddRegistration(RaceRegistration registration) => _db.RaceRegistrations.Add(registration);
 
-    public void RemoveRegistration(RaceRegistration registration) => _db.RaceRegistrations.Remove(registration);
+    public void RemoveRegistration(RaceRegistration registration)
+    {
+        // Keep the approval list consistent when an already-approved race entry is cancelled.
+        foreach (var proposal in _db.RaceApprovals.Where(r => r.RaceId == registration.RaceId
+                     && r.HorseId == registration.HorseId && r.Status == "Approved"))
+        {
+            proposal.Status = "Withdrawn";
+            proposal.Version = Guid.NewGuid().ToString();
+        }
+        _db.RaceRegistrations.Remove(registration);
+    }
 
     public Task SaveAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SWP.Application.Common;
 using SWP.Application.DTOs.Care;
+using SWP.Application.DTOs.Training;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
 
@@ -16,11 +17,16 @@ public class GroomController : ControllerBase
 {
     private readonly ICareService _careService;
     private readonly IHorseRealtimeNotifier _realtime;
+    private readonly ITrainingSessionService _trainingSessionService;
 
-    public GroomController(ICareService careService, IHorseRealtimeNotifier realtime)
+    public GroomController(
+        ICareService careService,
+        IHorseRealtimeNotifier realtime,
+        ITrainingSessionService trainingSessionService)
     {
         _careService = careService;
         _realtime = realtime;
+        _trainingSessionService = trainingSessionService;
     }
 
     [HttpGet("tasks")]
@@ -93,6 +99,21 @@ public class GroomController : ControllerBase
 
         await _realtime.NotifyHorseChangedAsync(result.Data!.HorseID, HorseRealtimeKinds.SuCo, cancellationToken);
         return Ok(result.Data);
+    }
+
+    [HttpPost("training-sessions/{sessionId:int}/report")]
+    public async Task<IActionResult> ReportTrainingSession(
+        int sessionId,
+        [FromBody] SubmitSessionReportRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+        {
+            return UnknownUser();
+        }
+
+        var result = await _trainingSessionService.SubmitReportAsync(sessionId, userId, request, cancellationToken);
+        return result.Success ? Ok(result.Data) : Error(result);
     }
 
     private IActionResult Error<T>(ServiceResult<T> result)

@@ -162,17 +162,30 @@ public class RaceService : IRaceService
             return ServiceResult<RaceResultUpdateDto>.NotFound("Ngựa này không đăng ký giải đua này");
         }
 
-        var field = await _races.CountActiveRegistrationsAsync(raceId, cancellationToken);
-        if (rank is int value && (value < 0 || value > field))
+        // Hạng 0 = không xếp hạng. Giải có ngựa của nhiều CLB nên cận trên là MaxParticipants của giải
+        // (không phải số ngựa của CLB đăng ký); MaxParticipants trống hoặc 0 = không giới hạn.
+        if (rank is int value)
         {
-            return ServiceResult<RaceResultUpdateDto>.Invalid("Thứ hạng không hợp lệ");
+            if (value < 0)
+            {
+                return ServiceResult<RaceResultUpdateDto>.Invalid("Thứ hạng phải là 0 (không xếp hạng) hoặc số nguyên từ 1 trở lên");
+            }
+
+            if (race.MaxParticipants is int max && max > 0 && value > max)
+            {
+                return ServiceResult<RaceResultUpdateDto>.Invalid($"Thứ hạng không được vượt quá {max} (số ngựa tối đa của giải)");
+            }
         }
 
-        if (rank is >= 1 && await _races.RankTakenAsync(raceId, rank.Value, registration.RegistrationId, cancellationToken))
+        if (rank is >= 1)
         {
-            return ServiceResult<RaceResultUpdateDto>.Fail(
-                ServiceErrorCodes.Conflict,
-                $"Thứ hạng {rank} đã được gán cho ngựa khác trong giải này");
+            var holder = await _races.GetRankHolderNameAsync(raceId, rank.Value, registration.RegistrationId, cancellationToken);
+            if (holder is not null)
+            {
+                return ServiceResult<RaceResultUpdateDto>.Fail(
+                    ServiceErrorCodes.Conflict,
+                    $"Thứ hạng {rank} đã được gán cho ngựa {holder} trong giải này");
+            }
         }
 
         var changed = registration.FinishPosition != rank;
@@ -276,6 +289,10 @@ public class RaceService : IRaceService
         TenGiai = race.RaceName,
         Ngay = race.RaceDate is DateTime date ? DateText(date) : string.Empty,
         DiaDiem = race.Location ?? string.Empty,
+        RegistrationDeadline = race.RegistrationDeadline is DateTime deadline ? DateText(deadline) : null,
+        EntryFee = race.EntryFee,
+        MaxParticipants = race.MaxParticipants,
+        Status = race.Status,
     };
 
     private RaceRegistrationDto MapRegistration(RaceRegistration registration) => new()

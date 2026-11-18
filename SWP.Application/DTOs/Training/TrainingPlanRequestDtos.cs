@@ -1,5 +1,10 @@
 namespace SWP.Application.DTOs.Training;
 
+public class ActivateTrainingPlanRequestDto
+{
+    public int? AssignedToUserId { get; set; }
+}
+
 public class CreateTrainingPlanRequestDto
 {
     public int HorseId { get; set; }
@@ -57,6 +62,7 @@ public class TrainingPhaseRequestDto
 
 public class GenerateWeeklyScheduleRequestDto
 {
+    public bool UsePlanAssignee { get; set; } = true;
     /// <summary> Ngày bất kỳ trong tuần cần xếp lịch (chuẩn hóa về Thứ Hai). </summary>
     public DateOnly WeekStartDate { get; set; }
 

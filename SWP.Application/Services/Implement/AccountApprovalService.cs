@@ -19,17 +19,24 @@ public class AccountApprovalService : IAccountApprovalService
     {
         var users = await _userRepository.GetPendingUsersAsync(cancellationToken);
         return users
+            .Where(IsHorseOwner)
             .Select(MapToDto)
             .OrderBy(u => u.CreatedAt)
             .ToList();
     }
 
+    public async Task<IReadOnlyList<PendingUserDto>> GetOwnerUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await _userRepository.GetHorseOwnerUsersAsync(cancellationToken);
+        return users.Select(MapToDto).ToList();
+    }
+
     public async Task<ApprovalResult> ApproveUserAsync(int userId, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdWithRoleAsync(userId, cancellationToken);
-        if (user is null)
+        if (user is null || !IsHorseOwner(user))
         {
-            return ApprovalResult.Fail("Không tìm thấy tài khoản.", "NOT_FOUND");
+            return ApprovalResult.Fail("Không tìm thấy tài khoản chủ ngựa.", "NOT_FOUND");
         }
 
         if (!string.Equals(user.Status, UserStatuses.Pending, StringComparison.OrdinalIgnoreCase))
@@ -41,8 +48,35 @@ public class AccountApprovalService : IAccountApprovalService
         user.UpdatedAt = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user, cancellationToken);
 
-        return ApprovalResult.Ok(MapToDto(user));
+        var fresh = await _userRepository.GetByIdWithRoleReadAsync(userId, cancellationToken);
+        return ApprovalResult.Ok(MapToDto(fresh!));
     }
+
+    public async Task<ApprovalResult> RejectUserAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdWithRoleAsync(userId, cancellationToken);
+        if (user is null || !IsHorseOwner(user))
+        {
+            return ApprovalResult.Fail("Không tìm thấy tài khoản chủ ngựa.", "NOT_FOUND");
+        }
+
+        if (!string.Equals(user.Status, UserStatuses.Pending, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApprovalResult.Fail("Tài khoản này không ở trạng thái chờ duyệt.", "NOT_PENDING");
+        }
+
+        user.Status = UserStatuses.Rejected;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        var fresh = await _userRepository.GetByIdWithRoleReadAsync(userId, cancellationToken);
+        return ApprovalResult.Ok(MapToDto(fresh!));
+    }
+
+    private static bool IsHorseOwner(Domain.Models.Entity.User user) =>
+        user.Role is not null
+        && RoleMapper.TryMapToCanonicalRoleId(user.Role.RoleName, out var mapped)
+        && string.Equals(mapped, RoleNames.HorseOwner, StringComparison.OrdinalIgnoreCase);
 
     private static PendingUserDto MapToDto(Domain.Models.Entity.User user) =>
         new()

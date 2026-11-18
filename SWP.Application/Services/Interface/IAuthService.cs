@@ -8,4 +8,9 @@ public interface IAuthService
     Task<LoginResult> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default);
 
     Task<RegisterResult> RegisterAsync(RegisterRequestDto request, CancellationToken cancellationToken = default);
+
+    Task<LoginResult> ChangePasswordAsync(
+        int userId,
+        ChangePasswordRequestDto request,
+        CancellationToken cancellationToken = default);
 }

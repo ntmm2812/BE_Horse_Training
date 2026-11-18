@@ -110,6 +110,44 @@ public class RaceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateResult_RankBoundIsRaceMaxParticipants_NotClubEntryCount()
+    {
+        var firstId = _t.AddHorse("Thunder");
+        var secondId = _t.AddHorse("Lightning");
+        var limited = AddRace(TestData.Today.AddDays(-9), "Có giới hạn", maxParticipants: 10);
+        AddRegistration(limited, firstId);
+        AddRegistration(limited, secondId);
+
+        var seventh = await _t.RaceService().UpdateResultAsync(limited, firstId, 7);
+        Assert.True(seventh.Success, seventh.ErrorMessage);
+
+        var tooHigh = await _t.RaceService().UpdateResultAsync(limited, secondId, 11);
+        Assert.Equal(ServiceErrorCodes.Validation, tooHigh.ErrorCode);
+        Assert.Contains("10", tooHigh.ErrorMessage);
+
+        var negative = await _t.RaceService().UpdateResultAsync(limited, secondId, -1);
+        Assert.Equal(ServiceErrorCodes.Validation, negative.ErrorCode);
+
+        var duplicate = await _t.RaceService().UpdateResultAsync(limited, secondId, 7);
+        Assert.Equal(ServiceErrorCodes.Conflict, duplicate.ErrorCode);
+        Assert.Contains("Thunder", duplicate.ErrorMessage);
+
+        var unranked = await _t.RaceService().UpdateResultAsync(limited, secondId, 0);
+        Assert.True(unranked.Success, unranked.ErrorMessage);
+
+        foreach (var max in new int?[] { null, 0 })
+        {
+            var open = AddRace(TestData.Today.AddDays(-5), $"Không giới hạn {max}", maxParticipants: max);
+            AddRegistration(open, firstId);
+            var far = await _t.RaceService().UpdateResultAsync(open, firstId, 50);
+            Assert.True(far.Success, far.ErrorMessage);
+        }
+
+        var races = await _t.RaceService().GetRacesAsync();
+        Assert.Contains(races, r => r.RaceID == limited && r.MaxParticipants == 10);
+    }
+
+    [Fact]
     public async Task GetRegistrations_OwnerSeesOnlyOwnHorses()
     {
         var ownId = _t.AddHorse("Thunder");
