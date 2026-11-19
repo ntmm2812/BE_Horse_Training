@@ -2,6 +2,10 @@ namespace SWP.Domain.Common;
 
 public static class RaceCatalog
 {
+    public const string Open = "Open";
+
+    public const string Cancelled = "Cancelled";
+
     public const string Registered = "Registered";
 
     public const string PrizeReview = "PrizeReview";

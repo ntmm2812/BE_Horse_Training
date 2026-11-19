@@ -7,6 +7,17 @@ public interface IRaceService
 {
     Task<IReadOnlyList<RaceDto>> GetRacesAsync(CancellationToken cancellationToken = default);
 
+    Task<ServiceResult<RaceDto>> CreateRaceAsync(
+        int managerId,
+        CreateRaceRequestDto request,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<RaceDto>> CancelRaceAsync(
+        int raceId,
+        int managerId,
+        CancelRaceRequestDto request,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<RaceRegistrationDto>> GetRegistrationsAsync(int? ownerUserId, CancellationToken cancellationToken = default);
 
     Task<ServiceResult<RaceRegistrationDto>> RegisterAsync(

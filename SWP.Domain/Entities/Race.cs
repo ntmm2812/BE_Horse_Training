@@ -27,6 +27,12 @@ public class Race
 
     public decimal? PrizePool { get; set; }
 
+    public decimal? PrizeFirst { get; set; }
+
+    public decimal? PrizeSecond { get; set; }
+
+    public decimal? PrizeThird { get; set; }
+
     public string Status { get; set; } = null!;
 
     public string? Description { get; set; }

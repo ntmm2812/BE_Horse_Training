@@ -79,6 +79,20 @@ public class RaceRepository : IRaceRepository
             .Select(r => r.Horse.HorseName)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public Task<bool> HasResultsAsync(int raceId, CancellationToken cancellationToken = default) =>
+        ActiveRegistrations().AnyAsync(r => r.RaceId == raceId && r.FinishPosition != null, cancellationToken);
+
+    public async Task<IReadOnlyList<RaceApproval>> ListPendingProposalsTrackedAsync(
+        int raceId,
+        CancellationToken cancellationToken = default) =>
+        await _db.RaceApprovals
+            .Where(r => r.RaceId == raceId
+                        && (r.Status == "Draft" || r.Status == "PendingOwner" || r.Status == "PendingManager"))
+            .ToListAsync(cancellationToken);
+
+    public Task<string?> GetUserNameAsync(int userId, CancellationToken cancellationToken = default) =>
+        _db.Users.Where(u => u.UserId == userId).Select(u => u.FullName).FirstOrDefaultAsync(cancellationToken);
+
     public Task<bool> HorseExistsAsync(int horseId, CancellationToken cancellationToken = default) =>
         _db.Horses.AnyAsync(h => h.HorseId == horseId, cancellationToken);
 
@@ -100,6 +114,8 @@ public class RaceRepository : IRaceRepository
 
         return await _db.Horses.AnyAsync(h => h.HorseId == horseId && h.LockedAt != null, cancellationToken);
     }
+
+    public void AddRace(Race race) => _db.Races.Add(race);
 
     public void AddRegistration(RaceRegistration registration) => _db.RaceRegistrations.Add(registration);
 
