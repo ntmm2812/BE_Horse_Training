@@ -33,6 +33,39 @@ public class RacesController : ControllerBase
         return Ok(await _races.GetRacesAsync(cancellationToken));
     }
 
+    // Quản lý CLB tạo giải mới (Status mặc định "Open").
+    [HttpPost]
+    [Authorize(Roles = RoleNames.ClubManager)]
+    public async Task<IActionResult> CreateRace(
+        [FromBody] CreateRaceRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+        {
+            return UnknownUser();
+        }
+
+        var result = await _races.CreateRaceAsync(userId, request, cancellationToken);
+        return result.Success ? StatusCode(StatusCodes.Status201Created, result.Data) : Error(result);
+    }
+
+    // Quản lý CLB hủy giải (không xóa): Status = Cancelled, đăng ký đang chờ duyệt bị đóng. Không hủy được giải đã diễn ra / đã có kết quả.
+    [HttpPost("{raceId:int}/cancel")]
+    [Authorize(Roles = RoleNames.ClubManager)]
+    public async Task<IActionResult> CancelRace(
+        int raceId,
+        [FromBody] CancelRaceRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+        {
+            return UnknownUser();
+        }
+
+        var result = await _races.CancelRaceAsync(raceId, userId, request, cancellationToken);
+        return result.Success ? Ok(result.Data) : Error(result);
+    }
+
     [HttpGet("registrations")]
     [Authorize(Roles = ReadRoles)]
     public async Task<IActionResult> GetRegistrations(CancellationToken cancellationToken)
@@ -69,9 +102,9 @@ public class RacesController : ControllerBase
         return NoContent();
     }
 
-    // Quản lý CLB nhập kết quả trên /manager/race-results; HLV vẫn được ghi nếu cần.
+    // Chỉ quản lý CLB nhập kết quả (trên /manager/race-results); HLV chỉ xem.
     [HttpPut("{raceId:int}/registrations/{horseId:int}/result")]
-    [Authorize(Roles = RoleNames.ClubManager + "," + RoleNames.HeadTrainer)]
+    [Authorize(Roles = RoleNames.ClubManager)]
     public async Task<IActionResult> UpdateResult(
         int raceId,
         int horseId,

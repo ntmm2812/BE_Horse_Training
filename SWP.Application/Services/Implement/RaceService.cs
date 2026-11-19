@@ -1,4 +1,6 @@
+using System.Text.Json;
 using SWP.Application.Common;
+using SWP.Application.DTOs.Approvals;
 using SWP.Application.DTOs.Race;
 using SWP.Application.Services.Interface;
 using SWP.Domain.Common;
@@ -24,6 +26,168 @@ public class RaceService : IRaceService
     {
         var races = await _races.ListRacesAsync(cancellationToken);
         return races.Select(MapRace).ToList();
+    }
+
+    public async Task<ServiceResult<RaceDto>> CreateRaceAsync(
+        int managerId,
+        CreateRaceRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var error = ValidateNewRace(request, out var name, out var location, out var description);
+        if (error is not null)
+        {
+            return ServiceResult<RaceDto>.Invalid(error);
+        }
+
+        var now = _clock.GetUtcNow().UtcDateTime;
+        var race = new Race
+        {
+            RaceName = name,
+            // RaceCode có unique index (SQL Server chỉ cho một NULL) nên luôn sinh mã riêng cho giải mới.
+            RaceCode = $"RC-{Guid.NewGuid():N}"[..13].ToUpperInvariant(),
+            Location = location,
+            RaceDate = request.Ngay!.Value.ToDateTime(TimeOnly.MinValue),
+            RegistrationDeadline = request.RegistrationDeadline!.Value.ToDateTime(TimeOnly.MinValue),
+            DistanceMeters = request.DistanceMeters,
+            MaxParticipants = request.MaxParticipants,
+            EntryFee = request.EntryFee ?? 0,
+            PrizeFirst = request.PrizeFirst,
+            PrizeSecond = request.PrizeSecond,
+            PrizeThird = request.PrizeThird,
+            // Có nhập hạng thì tổng luôn tự tính (không tin số FE gửi); không thì dùng tổng nhập tay.
+            PrizePool = HasRankPrize(request) ? RankPrizeTotal(request) : request.PrizePool,
+            Description = description,
+            Status = RaceCatalog.Open,
+            UserId = managerId,
+            CreatedAt = now,
+        };
+
+        _races.AddRace(race);
+        await _races.SaveAsync(cancellationToken);
+        return ServiceResult<RaceDto>.Ok(MapRace(race));
+    }
+
+    private string? ValidateNewRace(
+        CreateRaceRequestDto request,
+        out string name,
+        out string? location,
+        out string? description)
+    {
+        name = (request.TenGiai ?? string.Empty).Trim();
+        location = string.IsNullOrWhiteSpace(request.DiaDiem) ? null : request.DiaDiem.Trim();
+        description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        var today = LocalToday();
+
+        if (name.Length == 0) return "Vui lòng nhập tên giải.";
+        if (name.Length > 150) return "Tên giải tối đa 150 ký tự.";
+        if (location is { Length: > 255 }) return "Địa điểm tối đa 255 ký tự.";
+        if (request.Ngay is not { } raceDay) return "Vui lòng chọn ngày đua.";
+        if (raceDay <= today) return "Ngày đua phải sau hôm nay.";
+        if (request.RegistrationDeadline is not { } deadline) return "Vui lòng chọn hạn đăng ký.";
+        if (deadline < today) return "Hạn đăng ký không được ở quá khứ.";
+        if (deadline > raceDay) return "Hạn đăng ký không được sau ngày đua.";
+        if (request.DistanceMeters is not > 0) return "Cự ly phải lớn hơn 0 mét.";
+        if (request.MaxParticipants is not (>= 1 and <= 50)) return "Số ngựa tối đa từ 1 đến 50.";
+        if (request.EntryFee is < 0 or > MaxPrize) return "Lệ phí phải lớn hơn hoặc bằng 0.";
+        var prizeError = ValidateRankPrizes(request);
+        if (prizeError is not null) return prizeError;
+        if (!HasRankPrize(request) && request.PrizePool is < 0 or > MaxPrize) return "Tổng giải thưởng không hợp lệ.";
+        if (description is { Length: > 1000 }) return "Mô tả tối đa 1000 ký tự.";
+        return null;
+    }
+
+    private static bool HasRankPrize(CreateRaceRequestDto request) =>
+        request.PrizeFirst is not null || request.PrizeSecond is not null || request.PrizeThird is not null;
+
+    private static decimal RankPrizeTotal(CreateRaceRequestDto request) =>
+        (request.PrizeFirst ?? 0) + (request.PrizeSecond ?? 0) + (request.PrizeThird ?? 0);
+
+    // Mỗi hạng >= 0; các hạng đã nhập phải giảm dần: Nhất >= Nhì >= Ba.
+    private static string? ValidateRankPrizes(CreateRaceRequestDto request)
+    {
+        (string Name, decimal? Amount)[] ranks =
+        [
+            ("Nhất", request.PrizeFirst),
+            ("Nhì", request.PrizeSecond),
+            ("Ba", request.PrizeThird),
+        ];
+
+        foreach (var (name, amount) in ranks)
+        {
+            if (amount is < 0 or > MaxPrize) return $"Giải {name} phải lớn hơn hoặc bằng 0.";
+        }
+
+        var entered = ranks.Where(r => r.Amount is not null).ToArray();
+        for (var i = 1; i < entered.Length; i++)
+        {
+            if (entered[i].Amount > entered[i - 1].Amount)
+            {
+                return $"Giải {entered[i].Name} không được lớn hơn giải {entered[i - 1].Name}.";
+            }
+        }
+
+        return null;
+    }
+
+    public async Task<ServiceResult<RaceDto>> CancelRaceAsync(
+        int raceId,
+        int managerId,
+        CancelRaceRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var reason = (request.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+        {
+            return ServiceResult<RaceDto>.Invalid("Vui lòng nhập lý do hủy giải.");
+        }
+
+        if (reason.Length > 500)
+        {
+            return ServiceResult<RaceDto>.Invalid("Lý do hủy tối đa 500 ký tự.");
+        }
+
+        var race = await _races.GetRaceTrackedAsync(raceId, cancellationToken);
+        if (race is null)
+        {
+            return ServiceResult<RaceDto>.NotFound("Không tìm thấy giải đua");
+        }
+
+        if (RaceCatalog.IsClosedRace(race.Status))
+        {
+            return ServiceResult<RaceDto>.Fail(ServiceErrorCodes.Conflict, "Giải đã được hủy trước đó.");
+        }
+
+        var raceDate = RaceDay(race);
+        if (raceDate is null || raceDate.Value < LocalToday())
+        {
+            return ServiceResult<RaceDto>.Fail(ServiceErrorCodes.Conflict, "Giải đã diễn ra, không thể hủy.");
+        }
+
+        if (await _races.HasResultsAsync(raceId, cancellationToken))
+        {
+            return ServiceResult<RaceDto>.Fail(ServiceErrorCodes.Conflict, "Giải đã có kết quả, không thể hủy.");
+        }
+
+        var now = _clock.GetUtcNow().UtcDateTime;
+        race.Status = RaceCatalog.Cancelled;
+        race.UpdatedAt = now;
+
+        // Đăng ký còn chờ duyệt bị đóng bằng trạng thái Rejected có sẵn (HLV thấy "Giải đã hủy" ở lý do từ chối).
+        var managerName = await _races.GetUserNameAsync(managerId, cancellationToken) ?? "Quản lý CLB";
+        foreach (var proposal in await _races.ListPendingProposalsTrackedAsync(raceId, cancellationToken))
+        {
+            var history = JsonSerializer.Deserialize<List<ApprovalHistory>>(proposal.HistoryJson) ?? [];
+            history.Add(new ApprovalHistory("Manager", "Từ chối", managerName, $"Giải đã hủy: {reason}", now));
+            proposal.HistoryJson = JsonSerializer.Serialize(history);
+            proposal.Status = "Rejected";
+            proposal.RejectedBy = "Manager";
+            proposal.RejectReason = "Giải đã hủy";
+            proposal.TrainerSeen = false;
+            proposal.Version = Guid.NewGuid().ToString();
+        }
+
+        await _races.SaveAsync(cancellationToken);
+        return ServiceResult<RaceDto>.Ok(MapRace(race));
     }
 
     public async Task<IReadOnlyList<RaceRegistrationDto>> GetRegistrationsAsync(
@@ -293,6 +457,12 @@ public class RaceService : IRaceService
         EntryFee = race.EntryFee,
         MaxParticipants = race.MaxParticipants,
         Status = race.Status,
+        DistanceMeters = race.DistanceMeters,
+        PrizePool = race.PrizePool,
+        PrizeFirst = race.PrizeFirst,
+        PrizeSecond = race.PrizeSecond,
+        PrizeThird = race.PrizeThird,
+        Description = race.Description,
     };
 
     private RaceRegistrationDto MapRegistration(RaceRegistration registration) => new()

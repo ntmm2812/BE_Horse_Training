@@ -20,6 +20,9 @@ public class RaceConfiguration : IEntityTypeConfiguration<Race>
         entity.Property(e => e.EntryFee).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.Location).HasMaxLength(255);
         entity.Property(e => e.PrizePool).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.PrizeFirst).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.PrizeSecond).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.PrizeThird).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.RaceCode)
             .HasMaxLength(50)
             .IsUnicode(false);
